@@ -2,6 +2,20 @@
 
 AI-powered stock trading dashboard with Alpaca API integration.
 
+## 🎯 Quick Start: Run a Simulation
+
+Want to see the bot in action without risking real money? 
+
+**→ See [SIMULATION.md](./SIMULATION.md) for complete simulation guide**
+
+### Quick simulation (3 steps):
+
+1. Install dependencies: `npm install`
+2. Create `.env` file with `DRY_RUN=1` and your Alpaca API credentials
+3. Run the bot: `npm run dev`
+
+You'll see the bot analyze markets, generate signals, and log trades—all without executing real orders.
+
 ## 🎯 Running a Simulation (DRY_RUN Mode)
 
 The bot supports simulation mode where it analyzes the market and generates signals WITHOUT executing real trades.
