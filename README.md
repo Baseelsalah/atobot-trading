@@ -2,6 +2,48 @@
 
 AI-powered stock trading dashboard with Alpaca API integration.
 
+## 🎯 Running a Simulation (DRY_RUN Mode)
+
+The bot supports simulation mode where it analyzes the market and generates signals WITHOUT executing real trades.
+
+### How to run a simulation:
+
+1. **Set up your environment:**
+   ```bash
+   # Create .env file with DRY_RUN enabled
+   echo "DRY_RUN=1" > .env
+   echo "ALPACA_API_KEY=your_alpaca_key" >> .env
+   echo "ALPACA_API_SECRET=your_alpaca_secret" >> .env
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the bot:**
+   ```bash
+   npm run dev    # For development mode
+   # or
+   npm start      # For production mode
+   ```
+
+4. **What you should see:**
+   - `[SIM] DRY_RUN active - orders will be logged but not executed`
+   - Market data fetching
+   - Signal analysis (BUY/SELL/HOLD)
+   - `[DRY_RUN]` prefixed trade logs
+   - PnL calculations
+   - No actual orders sent to broker
+
+5. **Monitor the simulation:**
+   - Let it run for 5-10 minutes
+   - Watch for analysis cycles
+   - Verify no crashes or freezes
+   - Check that signals are being generated
+
+**Note:** Even in DRY_RUN mode, you need valid Alpaca API credentials because the bot fetches real market data and checks market hours. Only trade execution is disabled.
+
 ## Keep the bot running with tmux
 
 Use tmux so the bot keeps running after you disconnect.
@@ -11,7 +53,7 @@ Use tmux so the bot keeps running after you disconnect.
 2. Start a tmux session:
 	- `tmux new -s tradingbot`
 3. Run your bot inside tmux:
-	- `python main.py`
+	- `npm run dev` (for development) or `npm start` (for production)
 4. Detach (bot keeps running):
 	- Press `Ctrl + B`, then `D`
 5. Reattach later:
@@ -25,7 +67,7 @@ The bot only keeps running if it’s on a machine that stays awake. Use this qui
 
 1. Start your bot inside tmux:
 	- `tmux new -s tradingbot`
-	- `python main.py`
+	- `npm run dev` (for development) or `npm start` (for production)
 2. Detach from tmux:
 	- Press `Ctrl + B`, then `D`
 3. Close your laptop (sleep/disconnect is fine).
@@ -43,10 +85,17 @@ A VPS is a remote computer that stays on 24/7, perfect for running the bot even 
 1. Create a VPS (DigitalOcean, Linode, AWS, etc.).
 2. SSH into the server.
 3. Install prerequisites:
-	- Python (version required by this repo)
+	- Node.js (v18 or later)
+	- npm
 	- Git
-4. Clone the repo and install dependencies.
-5. Run the bot inside tmux (see the tmux section above).
+4. Clone the repo and install dependencies:
+	- `git clone <repo-url>`
+	- `cd atobot-trading`
+	- `npm install`
+5. Set up environment variables:
+	- Create a `.env` file with required API keys (see `.env.example` if available)
+	- Set `DRY_RUN=1` for simulation mode
+6. Run the bot inside tmux (see the tmux section above).
 
 Optional: For production, use a process manager (systemd or pm2) to auto-restart the bot if it crashes.
 
@@ -62,7 +111,7 @@ Optional: For production, use a process manager (systemd or pm2) to auto-restart
 	Type=simple
 	User=YOUR_USER
 	WorkingDirectory=/path/to/atobot-trading
-	ExecStart=/usr/bin/python3 /path/to/atobot-trading/main.py
+	ExecStart=/usr/bin/npm start
 	Restart=always
 	RestartSec=5
 
@@ -81,7 +130,7 @@ Optional: For production, use a process manager (systemd or pm2) to auto-restart
 1. Install pm2:
 	- `npm install -g pm2`
 2. Start the bot:
-	- `pm2 start "python3 /path/to/atobot-trading/main.py" --name atobot`
+	- `pm2 start npm --name atobot -- start`
 3. Save and enable startup:
 	- `pm2 save`
 	- `pm2 startup`
@@ -135,8 +184,8 @@ Use these commands to confirm the bot is running without digging through logs.
 	- `systemctl status tradingbot`
 	- Look for **active (running)**.
 5. Confirm the process is alive:
-	- `ps aux | grep main.py`
-	- If you see a Python process for the bot, it’s running.
+	- `ps aux | grep node`
+	- If you see a Node.js process for the bot, it’s running.
 
 ## Daily operator checklist (before market open)
 
@@ -158,8 +207,8 @@ Use this quick routine each morning to confirm the bot is healthy and ready for 
 	- `systemctl status tradingbot`
 	- Look for **active (running)**.
 6. Confirm the process exists:
-	- `ps aux | grep main.py`
-	- If you see a Python process for the bot, it’s alive.
+	- `ps aux | grep node`
+	- If you see a Node.js process for the bot, it’s alive.
 7. Optional: Check logs:
 	- pm2: `pm2 logs tradingbot`
 	- systemd: `journalctl -u tradingbot -f`
@@ -180,9 +229,9 @@ Run these steps in order. If all pass, the bot is ready for the next trading day
 4. Check the auto-restart layer:
 	- pm2: `pm2 status` (bot should be **online**)
 	- systemd: `systemctl status tradingbot` (should be **active (running)**)
-5. Confirm the Python process exists:
-	- `ps aux | grep main.py`
-	- If you see a Python process, the bot is running at the OS level.
+5. Confirm the Node.js process exists:
+	- `ps aux | grep node`
+	- If you see a Node.js process, the bot is running at the OS level.
 6. Optional: Check logs for errors:
 	- pm2: `pm2 logs tradingbot`
 	- systemd: `journalctl -u tradingbot -f`
