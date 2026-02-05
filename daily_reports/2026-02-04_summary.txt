@@ -1,0 +1,32 @@
+AtoBot Rolling Report (Last 5 Trading Days) - Generated 2026-02-04
+================================
+Period: 2026-01-29 → 2026-02-04 | tradingDays=5
+Trades: 0 | Wins: 0 | Losses: 0
+Win Rate: 0.0%
+Total P&L: $0.00
+Expectancy: $0.00
+Total Scans: 0 | Total Signals: 0
+
+Signal Counters:
+  No Signal: 0
+  Blocked: 0
+
+Data Quality:
+  Paired Trades: 0
+  Unpaired Entries: 0
+  Unpaired Exits: 0
+  Legacy (no trade_id): 0
+  HIGH confidence: 0
+
+Activity (Bot Scans):
+  Bot Was Running: NO
+  Scan Ticks: 0
+  Symbols Evaluated: 0
+  First Tick: N/A
+  Last Tick: N/A
+  Top Skip Reasons:
+    (none)
+  Note: No scan activity recorded (bot likely not running). Trade counts may reflect Alpaca history only.
+
+Top Skip Reasons:
+  (none)

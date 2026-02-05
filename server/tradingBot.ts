@@ -39,7 +39,32 @@ const USE_STRATEGY_ENGINE = true;  // P5: Enable deterministic strategies
 
 // Watchlist for day trading - RESTRICTED to allowed universe only
 import { DAY_TRADER_CONFIG } from "./dayTraderConfig";
-const ALLOWED_UNIVERSE = DAY_TRADER_CONFIG.ALLOWED_SYMBOLS; // SPY, QQQ, SH only
+const ALLOWED_UNIVERSE = dayTraderConfig.getEntryUniverse();
+
+const SIM_EXIT_DELAY_MS = parseInt(process.env.SIM_EXIT_DELAY_MS || "60000", 10);
+
+function scheduleSimulatedExit(tradeId: string, symbol: string, fallbackQty: number): void {
+  if (!alpaca.isDryRunActive()) return;
+  const delayMs = Number.isFinite(SIM_EXIT_DELAY_MS) ? SIM_EXIT_DELAY_MS : 60000;
+
+  setTimeout(async () => {
+    const trade = tradeLifecycle.getActiveTrade(tradeId);
+    if (!trade || trade.status !== "filled") return;
+
+    let exitPrice = trade.entryFilledPrice ?? trade.entrySignalPrice;
+    try {
+      const quote = await alpaca.getExtendedQuote(symbol);
+      if (quote && quote.price > 0) {
+        exitPrice = quote.price;
+      }
+    } catch {
+      // Fall back to entry price
+    }
+
+    const exitQty = trade.entryFilledQty ?? fallbackQty;
+    tradeLifecycle.recordExitFill(tradeId, exitPrice, exitQty, new Date().toISOString(), "manual");
+  }, delayMs);
+}
 
 // TIER-BASED STRATEGY GATING: Explicit registry of strategies requiring MACD (Tier 2)
 // This replaces fragile string-matching heuristics with explicit metadata
@@ -1457,6 +1482,8 @@ export async function executeTrade(recommendation: TradeRecommendation): Promise
             const timeWindowForSlippage = lifecycleTrade.metadata?.timeWindow || tradeLifecycle.determineTimeWindow();
             executionQuality.recordSlippage(strategyForSlippage, timeWindowForSlippage, slippageBps);
             console.log(`[P6] Slippage: ${slippageBps.toFixed(1)}bps strategy=${strategyForSlippage} window=${timeWindowForSlippage}`);
+
+            scheduleSimulatedExit(lifecycleTrade.tradeId, recommendation.symbol, recommendation.quantity);
           }
         } else if (fillResult.timedOut) {
           // Timeout - cancel order and skip
@@ -1507,6 +1534,8 @@ export async function executeTrade(recommendation: TradeRecommendation): Promise
           const timeWindowForSlippage = lifecycleTrade.metadata?.timeWindow || tradeLifecycle.determineTimeWindow();
           executionQuality.recordSlippage(strategyForSlippage, timeWindowForSlippage, slippageBps);
           console.log(`[P6] Slippage: ${slippageBps.toFixed(1)}bps strategy=${strategyForSlippage} window=${timeWindowForSlippage}`);
+
+          scheduleSimulatedExit(lifecycleTrade.tradeId, recommendation.symbol, recommendation.quantity);
         }
       }
     } else {

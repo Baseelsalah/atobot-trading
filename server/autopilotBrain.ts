@@ -6,10 +6,30 @@ import * as tradeBus from "./tradeIntelligenceBus";
 import * as profitManager from "./profitManager";
 import type { Trade, TradingStrategy, InsertTradingStrategy } from "@shared/schema";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
+const DISABLE_OPENAI = process.env.DISABLE_OPENAI === "1";
+if (DISABLE_OPENAI) {
+  console.log("[Autopilot Brain] OpenAI disabled via DISABLE_OPENAI=1");
+}
+
+const OPENAI_BASE_URL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+const OPENAI_API_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+let openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (DISABLE_OPENAI) {
+    throw new Error("OpenAI disabled");
+  }
+  if (!OPENAI_API_KEY) {
+    throw new Error("Missing AI_INTEGRATIONS_OPENAI_API_KEY");
+  }
+  if (!openai) {
+    openai = new OpenAI({
+      baseURL: OPENAI_BASE_URL,
+      apiKey: OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 const MODEL = "gpt-5";
 
@@ -130,6 +150,10 @@ async function createInitialStrategies(): Promise<void> {
 
 export async function conductResearch(): Promise<string> {
   console.log("[Autopilot Brain] Conducting market research...");
+
+  if (DISABLE_OPENAI) {
+    return "Research disabled (OpenAI off)";
+  }
   
   const trades = await storage.getTrades();
   const positions = await storage.getPositions();
@@ -205,7 +229,7 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -275,6 +299,10 @@ export async function createNewStrategy(
   type: string
 ): Promise<TradingStrategy | null> {
   console.log("[Autopilot Brain] Creating new strategy:", name);
+
+  if (DISABLE_OPENAI) {
+    return null;
+  }
   
   const prompt = `Create a detailed trading strategy for:
 Name: ${name}
@@ -291,7 +319,7 @@ Generate specific rules in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -697,6 +725,15 @@ export async function guideAtoStyle(): Promise<{
   exitRules: string[];
 }> {
   console.log("[Autopilot Brain] Analyzing optimal trading style for Ato...");
+
+  if (DISABLE_OPENAI) {
+    return {
+      preferredSetups: ["momentum breakout", "dip buying"],
+      avoidPatterns: ["chasing extended moves", "overtrading"],
+      entryRules: ["wait for confirmation", "verify trend"],
+      exitRules: ["take partial profits", "honor stop losses"],
+    };
+  }
   
   const trades = await storage.getTrades();
   const recentTrades = trades.slice(-30);
@@ -733,7 +770,7 @@ Create optimal DAY TRADING guidelines for Ato. Respond in JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

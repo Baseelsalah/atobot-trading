@@ -52,6 +52,24 @@ export const DAY_TRADER_CONFIG = {
   BREAKEVEN_OFFSET_PCT: 0.05,   // 0.05% buffer above entry to avoid spread/micro-noise
 };
 
+const UNIVERSE_OVERRIDE = process.env.TRADING_UNIVERSE
+  ? process.env.TRADING_UNIVERSE.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+  : [];
+
+if (UNIVERSE_OVERRIDE.length > 0) {
+  console.log(`[DayTraderConfig] Universe override active: ${UNIVERSE_OVERRIDE.join(",")}`);
+}
+
+function getAllowedUniverse(): string[] {
+  if (UNIVERSE_OVERRIDE.length > 0) return UNIVERSE_OVERRIDE;
+  return DAY_TRADER_CONFIG.ALLOWED_SYMBOLS;
+}
+
+function getBaselineUniverse(): string[] {
+  if (UNIVERSE_OVERRIDE.length > 0) return UNIVERSE_OVERRIDE;
+  return DAY_TRADER_CONFIG.BASELINE_UNIVERSE;
+}
+
 let newEntriesToday = 0;
 let dailyPnL = 0;
 const cooldownMap: Map<string, number> = new Map();
@@ -93,7 +111,7 @@ export function isDailyKillThresholdHit(): boolean {
 }
 
 export function isSymbolAllowed(symbol: string): boolean {
-  return DAY_TRADER_CONFIG.ALLOWED_SYMBOLS.includes(symbol.toUpperCase());
+  return getAllowedUniverse().includes(symbol.toUpperCase());
 }
 
 /**
@@ -105,13 +123,13 @@ export function isSymbolAllowedForEntry(symbol: string): { allowed: boolean; rea
   const upperSymbol = symbol.toUpperCase();
   
   // First check full universe
-  if (!DAY_TRADER_CONFIG.ALLOWED_SYMBOLS.includes(upperSymbol)) {
+  if (!getAllowedUniverse().includes(upperSymbol)) {
     return { allowed: false, reason: "SYMBOL_NOT_IN_UNIVERSE" };
   }
   
   // In baseline mode, further restrict to baseline universe
   if (DAY_TRADER_CONFIG.BASELINE_MODE) {
-    if (!DAY_TRADER_CONFIG.BASELINE_UNIVERSE.includes(upperSymbol)) {
+    if (!getBaselineUniverse().includes(upperSymbol)) {
       return { allowed: false, reason: "BASELINE_UNIVERSE_RESTRICTED" };
     }
   }
@@ -120,14 +138,14 @@ export function isSymbolAllowedForEntry(symbol: string): { allowed: boolean; rea
 }
 
 export function getAllowedSymbols(): string[] {
-  return [...DAY_TRADER_CONFIG.ALLOWED_SYMBOLS];
+  return [...getAllowedUniverse()];
 }
 
 export function getEntryUniverse(): string[] {
   if (DAY_TRADER_CONFIG.BASELINE_MODE) {
-    return [...DAY_TRADER_CONFIG.BASELINE_UNIVERSE];
+    return [...getBaselineUniverse()];
   }
-  return [...DAY_TRADER_CONFIG.ALLOWED_SYMBOLS];
+  return [...getAllowedUniverse()];
 }
 
 export function isBaselineMode(): boolean {

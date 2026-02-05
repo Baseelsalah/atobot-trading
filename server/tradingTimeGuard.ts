@@ -5,6 +5,11 @@ import { printEODSummary } from "./signalCounters";
 import * as positionManager from "./positionManager";
 import { initializeRiskEngine } from "./riskEngine";
 
+const TIME_GUARD_OVERRIDE = process.env.TIME_GUARD_OVERRIDE === "1";
+if (TIME_GUARD_OVERRIDE) {
+  console.log("[TIME GUARD] OVERRIDE ENABLED - time restrictions disabled (simulation mode)");
+}
+
 /**
  * ============================================================
  * FORT KNOX TRADING SCHEDULE - DYNAMIC EARLY CLOSE AWARE
@@ -245,6 +250,7 @@ function getEasternDateString(): string {
  * Entry window: 9:35 AM ET - dynamic cutoff (min of 11:35 AM ET and next_close - 5 min)
  */
 export function canOpenNewTrades(): boolean {
+  if (TIME_GUARD_OVERRIDE) return true;
   const { hour, minute } = getEasternTime();
   const currentMinutes = toMinutesSinceMidnight(hour, minute);
   
@@ -259,6 +265,7 @@ export function canOpenNewTrades(): boolean {
  * Management allowed: 9:35 AM ET - dynamic force close
  */
 export function canManagePositions(): boolean {
+  if (TIME_GUARD_OVERRIDE) return true;
   const { hour, minute } = getEasternTime();
   const currentMinutes = toMinutesSinceMidnight(hour, minute);
   
@@ -273,6 +280,7 @@ export function canManagePositions(): boolean {
  * Dynamic: min(3:45 PM ET, next_close - 2 minutes)
  */
 export function shouldForceClose(): boolean {
+  if (TIME_GUARD_OVERRIDE) return false;
   const { hour, minute } = getEasternTime();
   const currentMinutes = toMinutesSinceMidnight(hour, minute);
   
@@ -285,6 +293,7 @@ export function shouldForceClose(): boolean {
  * Check if we're before the entry window starts (before 9:35 AM ET)
  */
 export function isBeforeEntryWindow(): boolean {
+  if (TIME_GUARD_OVERRIDE) return false;
   const { hour, minute } = getEasternTime();
   const currentMinutes = toMinutesSinceMidnight(hour, minute);
   
