@@ -1,0 +1,43 @@
+{
+  "date": "2026-02-04",
+  "initializedAt": "2026-02-05T03:15:57.266Z",
+  "status": "ACTIVE",
+  "snapshotCount": 1,
+  "gateLogCount": 1,
+  "symbolsEvaluatedToday": 0,
+  "snapshots": [
+    {
+      "capturedAt": "2026-02-05T03:16:27.472Z",
+      "capturedAtET": "10:00 ET",
+      "phase": "during_entry",
+      "snapshot": {
+        "timestamp": "2026-02-05T03:16:27.459Z",
+        "combinedReason": "ENTRY_WINDOW_ACTIVE",
+        "marketOpen": true,
+        "tgStatus": {
+          "canOpenNewTrades": true,
+          "canManagePositions": true,
+          "shouldForceClose": false
+        },
+        "gateLogCount": 1,
+        "analysisLoopRunning": true
+      }
+    }
+  ],
+  "p1GateLogs": [
+    "[P1:GATE] QQQ PASS gates={spreadPass:true,volumePass:true,atrPass:true} skipReasons=[]"
+  ],
+  "p1TradabilityLogs": [
+    "[P1:TRADABILITY] 1/2 passed | topSkipReasons=[NO_SIGNAL:1, NO_QUOTE:1]"
+  ],
+  "passFailCounts": {
+    "pass": 1,
+    "fail": 0
+  },
+  "topSkipReasons": [],
+  "events": [
+    "10:00 ET: Proof bundle initialized",
+    "10:00 ET: First P1 gate log recorded",
+    "10:00 ET: Captured during_entry snapshot"
+  ]
+}

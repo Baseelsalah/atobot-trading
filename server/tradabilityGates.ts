@@ -31,8 +31,8 @@ export interface TradabilityConfig {
 }
 
 const DEFAULT_CONFIG: TradabilityConfig = {
-  spreadMaxDollars: 0.03,
-  spreadMaxPercent: 0.08,
+  spreadMaxDollars: 0.05,
+  spreadMaxPercent: 0.12,
   minDailyVolume: 500000,
   atrMinPercent: 0.25,
   atrMaxPercent: 6.0,
@@ -55,7 +55,7 @@ export function getConfig(): TradabilityConfig {
 }
 
 // P6: Spread near-max threshold - block if spread > 90% of max
-const SPREAD_NEAR_MAX_PCT = 0.90;
+const SPREAD_NEAR_MAX_PCT = 0.95;
 
 export async function checkSpreadGate(
   symbol: string,

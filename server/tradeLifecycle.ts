@@ -111,6 +111,35 @@ export interface TradeRecord {
 const activeTrades: Map<string, TradeRecord> = new Map();
 const completedTrades: TradeRecord[] = [];
 
+const SIM_PNL_ENABLED = process.env.DRY_RUN === "1";
+const SIM_PNL_SUMMARY_TRADES = parseInt(process.env.SIM_PNL_SUMMARY_TRADES || "5", 10);
+const SIM_PNL_SUMMARY_MS = parseInt(process.env.SIM_PNL_SUMMARY_MS || "3600000", 10);
+let simPnlTotal = 0;
+let simTradeCount = 0;
+let simLastSummaryTs = 0;
+
+function logSimPnl(trade: TradeRecord): void {
+  if (!SIM_PNL_ENABLED || trade.realizedPnl === null) return;
+
+  simTradeCount += 1;
+  simPnlTotal += trade.realizedPnl;
+
+  const entryPrice = trade.entryFilledPrice ?? trade.entrySignalPrice;
+  const exitPrice = trade.exitFilledPrice ?? entryPrice;
+
+  console.log(
+    `[SIM_PNL] trade_id=${trade.tradeId} symbol=${trade.symbol} entry=${entryPrice.toFixed(2)} ` +
+    `exit=${exitPrice.toFixed(2)} pnl=${trade.realizedPnl.toFixed(2)} total=${simPnlTotal.toFixed(2)} trades=${simTradeCount}`
+  );
+
+  const now = Date.now();
+  if (simTradeCount % SIM_PNL_SUMMARY_TRADES === 0 || now - simLastSummaryTs >= SIM_PNL_SUMMARY_MS) {
+    simLastSummaryTs = now;
+    const avgPnl = simTradeCount > 0 ? simPnlTotal / simTradeCount : 0;
+    console.log(`[SIM_PNL_SUMMARY] trades=${simTradeCount} total=${simPnlTotal.toFixed(2)} avg=${avgPnl.toFixed(2)}`);
+  }
+}
+
 // Reconciliation state
 let lastReconcileTime = 0;
 const RECONCILE_INTERVAL_MS = 30000; // 30 seconds
@@ -455,6 +484,8 @@ export function recordExitFill(
     
     trade.realizedPnlPercent = (trade.realizedPnl / entryValue) * 100;
   }
+
+  logSimPnl(trade);
   
   // P4: Set exit reason in metadata for measurement
   if (trade.metadata) {
@@ -521,6 +552,10 @@ export function getActiveTradeBySymbol(symbol: string): TradeRecord | null {
     }
   }
   return null;
+}
+
+export function getActiveTrade(tradeId: string): TradeRecord | null {
+  return activeTrades.get(tradeId) || null;
 }
 
 /**

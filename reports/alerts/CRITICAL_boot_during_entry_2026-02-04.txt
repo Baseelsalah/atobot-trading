@@ -1,0 +1,11 @@
+CRITICAL BOOT DURING ENTRY WINDOW
+==================================
+bootTimeET: 10:00 ET
+bootTimeUTC: 2026-02-05T03:15:56.668Z
+currentPID: 111475
+bootId: boot_1770261356676_111475
+marketStatus: OPEN
+nextOpen: 2026-02-06T03:15:56.677Z
+nextClose: 2026-02-05T09:15:56.677Z
+suspectedCause: Process started/restarted during entry window (9:35-11:35 ET)
+detectedAt: 2026-02-05T03:15:56.694Z

@@ -1,0 +1,9 @@
+CRITICAL DOWNTIME DETECTED
+========================
+lastHeartbeat: 09:45 ET (2026-02-05T02:43:26.744Z)
+currentTime: 09:45 ET (2026-02-05T02:47:50.938Z)
+downtimeMinutes: 4
+lastPID: 60298
+currentPID: 76530
+suspectedCause: Process died/restarted during market hours (no heartbeat for 4 min)
+detectedAt: 2026-02-05T02:47:50.938Z

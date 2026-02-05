@@ -74,25 +74,27 @@ interface AlpacaBar {
 
 // VWAP Reversion Strategy Configuration
 const VWAP_CONFIG = {
-  MIN_DEVIATION_PCT: 0.3,      // Minimum % deviation from VWAP to trigger
-  MAX_DEVIATION_PCT: 2.0,      // Maximum % deviation (too extended = risky)
-  RSI_OVERSOLD: 35,            // RSI threshold for buy signals
-  RSI_OVERBOUGHT: 65,          // RSI threshold for sell signals
-  MIN_VOLUME: 100000,          // Minimum volume requirement
-  BASE_CONFIDENCE: 60,         // Base confidence score
+  MIN_DEVIATION_PCT: 0.02,     // Minimum % deviation from VWAP to trigger
+  MAX_DEVIATION_PCT: 4.0,      // Maximum % deviation (too extended = risky)
+  RSI_OVERSOLD: 48,            // RSI threshold for buy signals
+  RSI_OVERBOUGHT: 52,          // RSI threshold for sell signals
+  MIN_VOLUME: 40000,           // Minimum volume requirement
+  BASE_CONFIDENCE: 58,         // Base confidence score
   MAX_CONFIDENCE: 85,          // Maximum confidence score
 };
 
 // ORB Strategy Configuration
 const ORB_CONFIG = {
   RANGE_MINUTES: 15,           // First 15 minutes define the opening range
-  BREAKOUT_BUFFER_PCT: 0.05,   // Must break by this % to confirm
+  BREAKOUT_BUFFER_PCT: 0.005,  // Must break by this % to confirm
   TREND_ALIGNMENT_EMA: 20,     // Use EMA20 for trend alignment
-  MIN_RANGE_PCT: 0.15,         // Minimum range size (% of price)
-  MAX_RANGE_PCT: 1.5,          // Maximum range size (too wide = skip)
-  BASE_CONFIDENCE: 65,         // Base confidence score
+  MIN_RANGE_PCT: 0.03,         // Minimum range size (% of price)
+  MAX_RANGE_PCT: 3.5,          // Maximum range size (too wide = skip)
+  BASE_CONFIDENCE: 50,         // Base confidence score
   MAX_CONFIDENCE: 85,          // Maximum confidence score
 };
+
+const ORB_TREND_TOLERANCE_PCT = 0.5; // Allow slight EMA misalignment for early-session breakouts
 
 /**
  * Get strategy config (for A/B framework)
@@ -196,6 +198,15 @@ function evaluateVWAPReversion(data: SymbolData): StrategySignal | null {
   // Calculate deviation from VWAP
   const deviation = ((currentPrice - vwapValue) / vwapValue) * 100;
   const absDeviation = Math.abs(deviation);
+
+  if (process.env.DEBUG_STRATEGY === "1" && data.symbol === "QQQ") {
+    console.log(
+      `[DEBUG][VWAP] ${data.symbol} price=${currentPrice.toFixed(2)} vwap=${vwapValue.toFixed(2)} ` +
+      `dev=${deviation.toFixed(3)}% rsi=${rsi.toFixed(1)} vol=${Math.floor(volume)} ` +
+      `minDev=${VWAP_CONFIG.MIN_DEVIATION_PCT}% maxDev=${VWAP_CONFIG.MAX_DEVIATION_PCT}% ` +
+      `rsiOS=${VWAP_CONFIG.RSI_OVERSOLD} rsiOB=${VWAP_CONFIG.RSI_OVERBOUGHT}`
+    );
+  }
   
   // Check volume requirement
   if (volume < VWAP_CONFIG.MIN_VOLUME) {
@@ -286,17 +297,31 @@ function evaluateORB(data: SymbolData): StrategySignal | null {
   }
   
   if (!data.bars || data.bars.length < 10) {
+    if (process.env.DEBUG_STRATEGY === "1" && data.symbol === "QQQ") {
+      console.log(`[DEBUG][ORB] ${data.symbol} insufficient bars: ${data.bars?.length || 0}`);
+    }
     return null;
   }
   
   const range = calculateOpeningRange(data.bars, ORB_CONFIG.RANGE_MINUTES);
   if (!range.valid) {
+    if (process.env.DEBUG_STRATEGY === "1" && data.symbol === "QQQ") {
+      console.log(`[DEBUG][ORB] ${data.symbol} opening range invalid`);
+    }
     return null;
   }
   
   const currentPrice = data.currentPrice;
   const rangeSize = range.high - range.low;
   const rangePct = (rangeSize / range.low) * 100;
+
+  if (process.env.DEBUG_STRATEGY === "1" && data.symbol === "QQQ") {
+    console.log(
+      `[DEBUG][ORB] ${data.symbol} price=${currentPrice.toFixed(2)} rangeHigh=${range.high.toFixed(2)} ` +
+      `rangeLow=${range.low.toFixed(2)} rangePct=${rangePct.toFixed(3)}% ema20=${data.indicators.ema20.toFixed(2)} ` +
+      `buffer=${ORB_CONFIG.BREAKOUT_BUFFER_PCT}% minRange=${ORB_CONFIG.MIN_RANGE_PCT}% maxRange=${ORB_CONFIG.MAX_RANGE_PCT}%`
+    );
+  }
   
   // Range size validation
   if (rangePct < ORB_CONFIG.MIN_RANGE_PCT || rangePct > ORB_CONFIG.MAX_RANGE_PCT) {
@@ -305,6 +330,8 @@ function evaluateORB(data: SymbolData): StrategySignal | null {
   
   const ema20 = data.indicators.ema20;
   const breakoutBuffer = currentPrice * (ORB_CONFIG.BREAKOUT_BUFFER_PCT / 100);
+  const emaBuyThreshold = ema20 * (1 - ORB_TREND_TOLERANCE_PCT / 100);
+  const emaSellThreshold = ema20 * (1 + ORB_TREND_TOLERANCE_PCT / 100);
   
   let side: SignalSide = "none";
   let reason = "";
@@ -312,14 +339,14 @@ function evaluateORB(data: SymbolData): StrategySignal | null {
   let breakoutDirection: "up" | "down" | undefined;
   
   // Bullish breakout: price above ORB high + buffer + trend alignment
-  if (currentPrice > range.high + breakoutBuffer && currentPrice > ema20) {
+  if (currentPrice > range.high + breakoutBuffer && currentPrice > emaBuyThreshold) {
     side = "buy";
     reason = `ORB breakout: price ${currentPrice.toFixed(2)} above range high ${range.high.toFixed(2)}, trend aligned (EMA20=${ema20.toFixed(2)})`;
     invalidation = range.high - breakoutBuffer; // Invalidate if falls back into range
     breakoutDirection = "up";
   }
   // Bearish breakout: price below ORB low - buffer + trend alignment
-  else if (currentPrice < range.low - breakoutBuffer && currentPrice < ema20) {
+  else if (currentPrice < range.low - breakoutBuffer && currentPrice < emaSellThreshold) {
     side = "sell";
     reason = `ORB breakdown: price ${currentPrice.toFixed(2)} below range low ${range.low.toFixed(2)}, trend aligned (EMA20=${ema20.toFixed(2)})`;
     invalidation = range.low + breakoutBuffer; // Invalidate if rises back into range
@@ -386,7 +413,7 @@ export function evaluateStrategies(data: SymbolData): StrategySignal[] {
  * Decision policy: choose best signal from multiple strategies
  * Returns highest confidence signal, or null if none pass threshold
  */
-export function selectBestSignal(signals: StrategySignal[], minConfidence: number = 60): StrategySignal | null {
+export function selectBestSignal(signals: StrategySignal[], minConfidence: number = 35): StrategySignal | null {
   if (signals.length === 0) return null;
   
   // Filter by minimum confidence

@@ -1,0 +1,96 @@
+{
+  "reportDate": "2026-02-04",
+  "periodStart": "2026-01-29",
+  "periodEnd": "2026-02-04",
+  "tradingDays": 5,
+  "reportIsRolling": true,
+  "baseline_mode": true,
+  "all_trades": {
+    "trade_count": 0,
+    "win_rate": 0,
+    "expectancy": 0,
+    "avg_win": 0,
+    "avg_loss": 0,
+    "profit_factor": 0
+  },
+  "high_confidence_only": {
+    "trade_count": 0,
+    "win_rate": 0,
+    "expectancy": 0,
+    "avg_win": 0,
+    "avg_loss": 0,
+    "profit_factor": 0
+  },
+  "overall": {
+    "totalScans": 0,
+    "totalSignals": 0,
+    "totalTrades": 0,
+    "wins": 0,
+    "losses": 0,
+    "winRate": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": 0,
+    "totalPnl": 0
+  },
+  "byTier": {
+    "tier1": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "totalPnl": 0,
+      "winRate": 0,
+      "expectancy": 0
+    },
+    "tier2": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "totalPnl": 0,
+      "winRate": 0,
+      "expectancy": 0
+    }
+  },
+  "byStrategy": {},
+  "skipReasons": [],
+  "dataQuality": {
+    "trades_with_trade_id": 0,
+    "trades_without_trade_id": 0,
+    "high_confidence_matches": 0,
+    "med_confidence_matches": 0,
+    "low_confidence_matches": 0,
+    "paired_trades": 0,
+    "unpaired_entries": 0,
+    "unpaired_exits": 0,
+    "legacy_orders_without_trade_id": 0
+  },
+  "executionQuality": {
+    "fillRate": 0,
+    "avgTimeToFillMs": 0,
+    "cancelRate": 0,
+    "timeoutRate": 0,
+    "slippageByStrategy": {},
+    "slippageByTimeWindow": {}
+  },
+  "activity": {
+    "botWasRunning": false,
+    "scanTicks": 0,
+    "symbolsEvaluated": 0,
+    "totalSkips": 0,
+    "noSignalCount": 0,
+    "signalsGenerated": 0,
+    "tradesProposed": 0,
+    "tradesSubmitted": 0,
+    "tradesFilled": 0,
+    "topSkipReasons": [],
+    "firstTickET": null,
+    "lastTickET": null,
+    "note": "No scan activity recorded (bot likely not running). Trade counts may reflect Alpaca history only."
+  },
+  "eod": {
+    "eodFlattenTriggered": false,
+    "positionsFlattenedCount": 0,
+    "overnightPositionsDetectedCount": 0,
+    "lastFlattenTs": null
+  }
+}
