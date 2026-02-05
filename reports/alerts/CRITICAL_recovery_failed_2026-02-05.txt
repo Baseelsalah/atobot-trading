@@ -1,0 +1,8 @@
+CRITICAL RECOVERY FAILED
+=========================
+dateET: 2026-02-05
+timeET: 00:21 ET
+timeUTC: 2026-02-05T05:21:06.147Z
+pid: 3736
+reason: NOT_LEADER
+checks: {"leaderLock":false,"alpacaClock":null,"alpacaAccount":null,"positionsLoaded":null,"ordersLoaded":null,"riskStateOk":null}
