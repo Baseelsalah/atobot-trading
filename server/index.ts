@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -133,6 +134,79 @@ app.use((req, res, next) => {
   });
 
   next();
+});
+
+// Health check endpoints for monitoring
+app.get("/health", async (_req, res) => {
+  try {
+    const botStatus = tradingBot.getBotStatus();
+    const runtimeStatus = await runtimeMonitor.getRuntimeStatus();
+
+    const status = {
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      botStatus: botStatus.status,
+      botAction: botStatus.currentAction,
+      marketStatus: runtimeStatus.marketStatus,
+      entryAllowed: runtimeStatus.tradeEntryAllowedByLeader,
+      tradingState: runtimeStatus.tradingState,
+      lastTickET: runtimeStatus.lastTickET,
+      ticksSinceBoot: runtimeStatus.ticksSinceBoot,
+      pid: process.pid,
+      version: envScopeModule.getVersion(),
+      memoryMB: runtimeStatus.memoryMB,
+    };
+
+    res.status(200).json(status);
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+app.get("/readiness", async (_req, res) => {
+  try {
+    const botStatus = tradingBot.getBotStatus();
+    const runtimeStatus = await runtimeMonitor.getRuntimeStatus();
+
+    // Parse lastTickET to timestamp
+    let timeSinceLastTick = Infinity;
+    if (runtimeStatus.lastTickET) {
+      try {
+        // lastTickET format is like "2026-02-04 10:30"
+        const tickDate = new Date(runtimeStatus.lastTickET);
+        timeSinceLastTick = Date.now() - tickDate.getTime();
+      } catch {
+        // If parsing fails, consider it stale
+        timeSinceLastTick = Infinity;
+      }
+    }
+
+    // Ready if bot is active AND ticked within last 5 minutes
+    const ready =
+      (botStatus.status === "active" || botStatus.status === "analyzing") &&
+      timeSinceLastTick < 300000; // 5 min
+
+    const status = {
+      ready,
+      botStatus: botStatus.status,
+      lastTickET: runtimeStatus.lastTickET,
+      timeSinceLastTick: isFinite(timeSinceLastTick)
+        ? Math.floor(timeSinceLastTick / 1000)
+        : null, // seconds
+      marketStatus: runtimeStatus.marketStatus,
+    };
+
+    res.status(ready ? 200 : 503).json(status);
+  } catch (error) {
+    res.status(503).json({
+      ready: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 (async () => {

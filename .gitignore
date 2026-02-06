@@ -4,3 +4,33 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.env
+.env.local
+.env.production
+
+# PM2 logs
+logs/
+*.log
+out.log
+err.log
+.pm2/
+
+# Reports and runtime state (sensitive data)
+reports/
+daily_reports/
+
+# Database
+*.db
+*.sqlite
+
+# Build
+*.tsbuildinfo
+.vite/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

@@ -246,9 +246,9 @@ export async function validateTrade(
     // Clamp score
     score = Math.max(0, Math.min(100, score));
     
-    // LOWERED THRESHOLD: Require score >= 40 for approval (was 65)
+    // LOWERED THRESHOLD: Require score >= 35 for approval (was 65)
     // Changed 2026-01-31: Allow trades with minor flags (e.g., weak volume only)
-    const APPROVAL_THRESHOLD = 40;
+    const APPROVAL_THRESHOLD = 35;
     const approved = score >= APPROVAL_THRESHOLD;
     
     // Build flags array (always computed, even for approved trades)

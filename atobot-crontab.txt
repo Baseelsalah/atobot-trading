@@ -1,0 +1,24 @@
+# AtoBot Crontab - Ready to Install
+# Generated: 2026-02-06
+
+# Set PATH for npm/node
+PATH=/usr/local/bin:/usr/bin:/bin
+SHELL=/bin/bash
+
+# Pre-Market Routine - 8:30 AM ET (1:30 PM UTC standard time)
+30 13 * * 1-5 cd /workspaces/atobot-trading && npm run daily:premarket >> /tmp/atobot-premarket.log 2>&1
+
+# Trading Hours Monitor - Every 30 min (9:30 AM - 4:00 PM ET)
+*/30 14-20 * * 1-5 cd /workspaces/atobot-trading && npm run daily:monitor >> /tmp/atobot-monitor.log 2>&1
+
+# Post-Market Routine - 4:15 PM ET (9:15 PM UTC)
+15 21 * * 1-5 cd /workspaces/atobot-trading && npm run daily:postmarket >> /tmp/atobot-postmarket.log 2>&1
+
+# Weekly Performance Report - Sunday 6:00 PM
+0 18 * * 0 cd /workspaces/atobot-trading && npm run weekly:report >> /tmp/atobot-weekly.log 2>&1
+
+# Daily Backup - 11:55 PM
+55 23 * * * cd /workspaces/atobot-trading && npm run daily:backup >> /tmp/atobot-backup.log 2>&1
+
+# Monthly Strategy Analysis - 1st of month at 2:00 AM
+0 2 1 * * cd /workspaces/atobot-trading && npm run monthly:analyze >> /tmp/atobot-monthly.log 2>&1

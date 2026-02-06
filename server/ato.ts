@@ -14,10 +14,31 @@ import { storage } from "./storage";
 import { generateTradeId } from "./tradeId";
 import type { TradingStrategy, TradeRecommendation, Position, BotSettings } from "@shared/schema";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
+const DISABLE_OPENAI = process.env.DISABLE_OPENAI === "1";
+if (DISABLE_OPENAI) {
+  console.log("[Ato] OpenAI disabled via DISABLE_OPENAI=1");
+}
+
+const OPENAI_BASE_URL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+const OPENAI_API_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+let openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (DISABLE_OPENAI) {
+    throw new Error("OpenAI disabled");
+  }
+  if (!OPENAI_API_KEY) {
+    throw new Error("Missing AI_INTEGRATIONS_OPENAI_API_KEY");
+  }
+  if (!openai) {
+    openai = new OpenAI({
+      baseURL: OPENAI_BASE_URL,
+      apiKey: OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
+
 const MODEL = "gpt-5";
 
 interface AtoState {
@@ -138,6 +159,17 @@ export async function initializeAto(): Promise<void> {
 
 export async function readMarket(symbols: string[]): Promise<MarketRead> {
   console.log("[Ato] Reading market conditions like a day trader...");
+
+  if (DISABLE_OPENAI) {
+    return {
+      overallSentiment: "neutral",
+      momentum: "mixed",
+      volatility: "normal",
+      keyLevels: {},
+      hotSectors: [],
+      warnings: ["OpenAI disabled"],
+    };
+  }
   
   const positions = await storage.getPositions();
   const recentTrades = await storage.getTrades();
@@ -171,7 +203,7 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -225,6 +257,17 @@ export async function thinkLikeTrader(
   takeProfit: number;
 }> {
   console.log(`[Ato] Analyzing ${symbol} like a day trader...`);
+
+  if (DISABLE_OPENAI) {
+    return {
+      action: "hold",
+      confidence: 0,
+      reason: "OpenAI disabled",
+      quantity: 0,
+      stopLoss: currentPrice * 0.98,
+      takeProfit: currentPrice * 1.05,
+    };
+  }
   
   const positions = await storage.getPositions();
   const existingPosition = positions.find(p => p.symbol === symbol);
@@ -319,7 +362,7 @@ Respond in JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

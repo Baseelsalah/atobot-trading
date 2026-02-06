@@ -1,14 +1,33 @@
 import OpenAI from "openai";
+import { withRetry } from "./utils/retry.js";
 
-// This is using Replit's AI Integrations service, which provides OpenAI-compatible API access
-// without requiring your own OpenAI API key. Charges are billed to your Replit credits.
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
+const DISABLE_OPENAI = process.env.DISABLE_OPENAI === "1";
+if (DISABLE_OPENAI) {
+  console.log("[OpenAI] Disabled via DISABLE_OPENAI=1 (skipping AI calls)");
+}
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const MODEL = "gpt-5";
+const OPENAI_BASE_URL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+const OPENAI_API_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+let openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (DISABLE_OPENAI) {
+    throw new Error("OpenAI disabled");
+  }
+  if (!OPENAI_API_KEY) {
+    throw new Error("Missing AI_INTEGRATIONS_OPENAI_API_KEY");
+  }
+  if (!openai) {
+    openai = new OpenAI({
+      baseURL: OPENAI_BASE_URL,
+      apiKey: OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
+
+// Model configuration - use environment variable or default to gpt-4
+const MODEL = process.env.OPENAI_MODEL || "gpt-4";
 
 interface MarketAnalysis {
   summary: string;
@@ -44,6 +63,17 @@ export async function analyzeMarket(
   currentPositions: { symbol: string; qty: number; unrealizedPL: number }[],
   riskSettings: { maxPositionSize: number; stopLossPercent: number; takeProfitPercent: number }
 ): Promise<MarketAnalysis> {
+  if (DISABLE_OPENAI) {
+    return {
+      summary: "OpenAI disabled",
+      sentiment: "neutral",
+      confidence: 0,
+      symbols: watchlist,
+      recommendations: [],
+      technicalIndicators: [],
+      newsFactors: ["OpenAI disabled"],
+    };
+  }
   const positionsSummary = currentPositions.length > 0
     ? currentPositions.map((p) => `${p.symbol}: ${p.qty} shares, P/L: $${p.unrealizedPL.toFixed(2)}`).join(", ")
     : "No current positions";
@@ -89,12 +119,20 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
-    });
+    const response = await withRetry(
+      () => getOpenAI().chat.completions.create({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      }),
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        onRetry: (error, attempt) =>
+          console.log(`[OpenAI] Market analysis retry ${attempt}/3: ${error.message}`),
+      }
+    );
 
     const content = response.choices[0]?.message?.content || "{}";
     console.log("[OpenAI] Raw response:", content.substring(0, 500));
@@ -149,6 +187,21 @@ export async function analyzeStock(
   currentPrice: number,
   portfolioContext: string
 ): Promise<StockAnalysis> {
+  if (DISABLE_OPENAI) {
+    return {
+      symbol,
+      currentPrice,
+      priceHistory,
+      analysis: "OpenAI disabled",
+      recommendation: {
+        symbol,
+        action: "hold",
+        reason: "OpenAI disabled",
+        confidence: 0,
+        riskLevel: "low",
+      },
+    };
+  }
   const priceChange = priceHistory.length > 1
     ? ((currentPrice - priceHistory[0]) / priceHistory[0] * 100).toFixed(2)
     : "0";
@@ -179,12 +232,20 @@ Provide a detailed analysis and trading recommendation in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 1024,
-    });
+    const response = await withRetry(
+      () => getOpenAI().chat.completions.create({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1024,
+      }),
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        onRetry: (error, attempt) =>
+          console.log(`[OpenAI] Stock analysis retry ${attempt}/3: ${error.message}`),
+      }
+    );
 
     const content = response.choices[0]?.message?.content || "{}";
     return JSON.parse(content) as StockAnalysis;
@@ -224,11 +285,19 @@ Provide a concise trading strategy including:
 4. Time-based considerations for day trading`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 1024,
-    });
+    const response = await withRetry(
+      () => getOpenAI().chat.completions.create({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        max_completion_tokens: 1024,
+      }),
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        onRetry: (error, attempt) =>
+          console.log(`[OpenAI] Strategy generation retry ${attempt}/3: ${error.message}`),
+      }
+    );
 
     return response.choices[0]?.message?.content || "Unable to generate strategy";
   } catch (error) {

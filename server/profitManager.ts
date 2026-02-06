@@ -1,6 +1,11 @@
 import * as alpaca from "./alpaca";
 import { storage } from "./storage";
 import { getEasternTime, toMinutesSinceMidnight } from "./timezone";
+import {
+  loadDailyState,
+  updatePersistentPnL,
+  markResetCompleted,
+} from "./persistentState.js";
 
 // REMOVED: Daily profit goal forcing logic - don't size up or trade more because we're "behind goal"
 // Keep only hard safety limits (max daily loss)
@@ -68,23 +73,35 @@ function getTradingDateET(): string {
 
 export function checkAndResetDaily(): boolean {
   const currentDate = getTradingDateET();
-  
+
   if (lastTradingDate !== currentDate) {
     console.log(`[ProfitManager] New trading day detected: ${currentDate} (previous: ${lastTradingDate || 'none'})`);
-    
+
     if (lastTradingDate !== null) {
       console.log(`[ProfitManager] Previous day summary: Realized P/L: $${dailyRealizedPL.toFixed(2)}, Trades: ${todayPerformance.totalTrades}, Win Rate: ${todayPerformance.winRate.toFixed(1)}%`);
     }
-    
-    dailyRealizedPL = 0;
+
+    // Try to load persisted state for today
+    const persistedState = loadDailyState();
+
+    if (persistedState) {
+      // Restore state from persistent storage
+      dailyRealizedPL = persistedState.dailyRealizedPL;
+      console.log(`[ProfitManager] Restored from persistent state: Realized P/L: $${dailyRealizedPL.toFixed(2)}`);
+    } else {
+      // New day - reset everything
+      dailyRealizedPL = 0;
+      markResetCompleted();
+    }
+
     todayPerformance = createEmptyPerformance();
     positionTrackers.clear();
     lastTradingDate = currentDate;
-    
+
     console.log("[ProfitManager] Daily tracking reset for new trading day");
     return true;
   }
-  
+
   return false;
 }
 
@@ -323,6 +340,10 @@ export function getPerformance(): TradePerformance {
 
 export function recordTradeResult(symbol: string, profit: number, isWin: boolean): void {
   dailyRealizedPL += profit;
+
+  // Persist to disk after every trade
+  updatePersistentPnL(0, dailyRealizedPL); // dailyPnL will be synced from dayTraderConfig
+
   todayPerformance.totalTrades++;
   
   if (isWin) {

@@ -1,0 +1,154 @@
+# AtoBot Crontab Template - Full Automation
+#
+# This crontab setup runs the bot completely hands-free:
+# - Pre-market routine at 8:30 AM ET (switches to live mode, starts bot)
+# - Monitoring every hour during trading
+# - Post-market routine at 4:15 PM ET (verifies positions closed, switches to test mode)
+#
+# To install:
+# 1. Edit this file and replace /path/to/atobot with your actual path
+# 2. Run: crontab -e
+# 3. Paste the lines below (excluding comments starting with #)
+# 4. Save and exit
+#
+# IMPORTANT: Adjust times for your timezone!
+# Times below are in UTC (add/subtract based on your server's timezone)
+# ET = UTC-5 (or UTC-4 during daylight saving)
+#
+# Example: 8:30 AM ET = 1:30 PM UTC (standard) or 12:30 PM UTC (daylight saving)
+
+# Set PATH to ensure npm/node are found
+PATH=/usr/local/bin:/usr/bin:/bin
+SHELL=/bin/bash
+
+# Pre-Market Routine - Runs at 8:30 AM ET every weekday
+# UTC times (adjust for your timezone):
+# - Standard Time (Nov-Mar): 1:30 PM UTC = 8:30 AM ET
+# - Daylight Time (Mar-Nov): 12:30 PM UTC = 8:30 AM ET
+30 13 * * 1-5 cd /path/to/atobot && npm run daily:premarket >> /tmp/atobot-premarket.log 2>&1
+
+# Trading Hours Monitoring - Every 30 minutes from 9:30 AM to 4:00 PM ET
+# Checks bot health, restarts if needed, alerts on issues
+# UTC times for 9:30 AM - 4:00 PM ET (14:30-21:00 UTC standard time)
+*/30 14-20 * * 1-5 cd /path/to/atobot && npm run daily:monitor >> /tmp/atobot-monitor.log 2>&1
+
+# Post-Market Routine - Runs at 4:15 PM ET every weekday
+# UTC times:
+# - Standard Time: 9:15 PM UTC = 4:15 PM ET
+# - Daylight Time: 8:15 PM UTC = 4:15 PM ET
+15 21 * * 1-5 cd /path/to/atobot && npm run daily:postmarket >> /tmp/atobot-postmarket.log 2>&1
+
+# Optional: Weekly cleanup of old logs (Sunday at 2:00 AM)
+0 2 * * 0 cd /path/to/atobot && find /tmp/atobot-*.log -mtime +7 -delete
+
+# Optional: Daily backup of reports (11:59 PM every day)
+59 23 * * * cd /path/to/atobot && tar -czf /path/to/backups/atobot-reports-$(date +\%Y-\%m-\%d).tar.gz reports/ daily_reports/
+
+##############################################################################
+# ALTERNATIVE: Simpler Setup (Just Auto-Start Bot at 8:25 AM)
+##############################################################################
+# If you want less automation and prefer manual mode switching, just auto-start:
+# 25 13 * * 1-5 cd /path/to/atobot && npm run pm2:start >> /tmp/atobot-start.log 2>&1
+
+##############################################################################
+# Timezone Conversion Reference
+##############################################################################
+# ET (Eastern Time) Zone changes:
+# - Standard Time (EST): UTC-5 (early November - mid March)
+# - Daylight Time (EDT): UTC-4 (mid March - early November)
+#
+# Common Trading Day Events (ET → UTC Standard Time):
+# 8:30 AM ET = 1:30 PM UTC  (pre-market routine)
+# 9:30 AM ET = 2:30 PM UTC  (market open)
+# 4:00 PM ET = 9:00 PM UTC  (market close)
+# 4:15 PM ET = 9:15 PM UTC  (post-market routine)
+#
+# For other timezones:
+# - PT (Pacific): ET-3 hours
+# - CT (Central): ET+1 hour
+# - GMT/UTC: ET+5 hours (standard) or +4 hours (daylight)
+
+##############################################################################
+# Testing Your Crontab
+##############################################################################
+# 1. List current crontab: crontab -l
+# 2. Test command manually:
+#    cd /path/to/atobot && npm run daily:premarket
+# 3. Check cron logs:
+#    tail -f /var/log/syslog | grep CRON
+#    # or on some systems:
+#    tail -f /var/log/cron
+# 4. Check automation logs:
+#    tail -f /tmp/atobot-premarket.log
+#    tail -f /tmp/atobot-monitor.log
+#    tail -f /tmp/atobot-postmarket.log
+
+##############################################################################
+# Monitoring Cron Jobs
+##############################################################################
+# To verify cron is working:
+# 1. Check if cron service is running:
+#    systemctl status cron
+#    # or: service cron status
+#
+# 2. View most recent automation logs:
+#    cat /workspaces/atobot-trading/reports/automation.jsonl | tail -10
+#
+# 3. Check for alerts:
+#    ls -ltr /workspaces/atobot-trading/reports/alerts/
+#
+# 4. View PM2 bot status:
+#    npm run pm2:status
+
+##############################################################################
+# Email/SMS Alerts Setup (Optional)
+##############################################################################
+# To receive alerts via email/SMS when automation runs or fails:
+# 1. Install mailutils or sendmail:
+#    sudo apt-get install mailutils
+#
+# 2. Add MAILTO to crontab (at the top):
+#    MAILTO=your-email@example.com
+#
+# 3. Cron will email you output from commands
+#
+# For SMS alerts:
+# 1. Sign up for Twilio (free tier available)
+# 2. Add credentials to .env:
+#    TWILIO_ACCOUNT_SID=...
+#    TWILIO_AUTH_TOKEN=...
+#    TWILIO_FROM_NUMBER=+1...
+#    TWILIO_TO_NUMBER=+1...
+# 3. Alerts will be sent via scripts/daily-automation.ts
+
+##############################################################################
+# DANGER ZONE - Full Hands-Free Trading
+##############################################################################
+# ⚠️  WARNING: The crontab above enables FULLY AUTOMATED TRADING
+#
+# What this means:
+# - Bot automatically switches to LIVE MODE at 8:30 AM ET
+# - Real orders are placed without your confirmation
+# - Real money is at risk
+# - You only get alerted if something goes wrong
+#
+# Before enabling:
+# ✅ Test in paper trading for 2+ weeks
+# ✅ Verify smoke tests pass consistently
+# ✅ Understand the strategies being used
+# ✅ Set appropriate daily loss limits
+# ✅ Have alerts configured (email/SMS)
+# ✅ Monitor first week manually
+#
+# Safety Limits (configured in server/dayTraderConfig.ts):
+# - MAX_NEW_ENTRIES_PER_DAY: 10 trades max
+# - DAILY_MAX_LOSS: -$500 (stops new entries)
+# - DAILY_MAX_PROFIT: +$500 (stops new entries)
+# - FORT KNOX time guard: Only trades 9:35 AM - 11:35 AM ET
+# - Force close: All positions closed by 3:45 PM ET
+#
+# You can monitor anytime via:
+# - Dashboard: http://your-server:5000
+# - Logs: npm run pm2:logs --follow
+# - Status: npm run pm2:status
+# - Alerts: Check reports/alerts/ directory
