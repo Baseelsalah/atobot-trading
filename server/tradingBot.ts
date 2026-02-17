@@ -31,6 +31,7 @@ import * as entryWindowProof from "./entryWindowProof";
 import * as executionTrace from "./executionTrace";
 import * as regimeState from "./regimeState";
 import * as controlLoopTrace from "./controlLoopTrace";
+import * as accountManager from "./accountManager";
 import type { BotStatus, TradeRecommendation } from "@shared/schema";
 
 // P5: Strategy-based signal generation (deterministic, no LLM dependency)
@@ -110,6 +111,16 @@ let brainCycleCounter = 0;
 
 export function getBotStatus(): BotStatus {
   return { ...botStatus };
+}
+
+// Helper: get admin's portfolio equity for multi-account scaling
+async function getAdminEquity(): Promise<number> {
+  try {
+    const account = await alpaca.getAccount();
+    return parseFloat(account.equity);
+  } catch {
+    return 0;
+  }
 }
 
 export async function startBot(): Promise<void> {
@@ -566,7 +577,7 @@ async function runAnalysisCycle(): Promise<void> {
     // Use brain to filter and adjust recommendation confidence
     const rawRecommendations = analysis.recommendations || [];
     const llmRecommendations = brain.filterRecommendations(rawRecommendations);
-    const MIN_CONFIDENCE_THRESHOLD = 50; // Minimum confidence to execute a trade
+    const MIN_CONFIDENCE_THRESHOLD = 55; // PRO: Raised from 50% to 55% - only trade high-quality setups
     
     // FAIL-CLOSED: If no recommendations or only "hold" actions, log ACTION=NO_SIGNAL
     const actionableRecs = llmRecommendations.filter(r => r.action === "buy" || r.action === "sell");
@@ -1049,16 +1060,35 @@ async function runAnalysisCycle(): Promise<void> {
         // EXECUTION TRACKING: Record successful trade execution
         signalCounters.recordExecution(rec.symbol, rec.action);
         executedThisCycle++;
-        
+
         await storage.createAlert({
           type: "info",
           title: `Ato Executed: ${rec.action.toUpperCase()} ${rec.symbol}`,
           message: `Bought ${quantity} shares at $${currentPrice.toFixed(2)}. Reason: ${rec.reason}`,
           requiresApproval: false,
         });
-        
+
         // Record trade result for Ato's daily stats
         ato.recordTradeResult(rec.symbol, 0); // P/L will be calculated on close
+
+        // Multi-account: replicate trade for all approved users proportionally
+        try {
+          const portfolioValue = await getAdminEquity();
+          if (portfolioValue > 0) {
+            const multiResults = await accountManager.executeTradeForAllUsers(
+              recommendation, quantity, portfolioValue, settings
+            );
+            for (const r of multiResults) {
+              if (r.success) {
+                console.log(`[MultiAccount] ✓ ${r.email}: ${recommendation.side} ${r.scaledQty} ${recommendation.symbol}`);
+              } else {
+                console.log(`[MultiAccount] ✗ ${r.email}: ${r.message}`);
+              }
+            }
+          }
+        } catch (multiErr: any) {
+          console.error(`[MultiAccount] Error replicating trade: ${multiErr.message}`);
+        }
       } else {
         // Trade passed all filters but execution failed
         skipCounters.recordSkip("EXECUTION_FAILED");

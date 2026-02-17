@@ -66,11 +66,11 @@ export async function checkSpreadGate(
   if (!bid || !ask || !price || bid <= 0 || ask <= 0 || price <= 0) {
     return { passed: false, reason: "spread:missing" };
   }
-  
+
   const spread = ask - bid;
   const spreadPercent = (spread / price) * 100;
   const maxAllowed = Math.max(config.spreadMaxDollars, (config.spreadMaxPercent / 100) * price);
-  
+
   if (spread > maxAllowed) {
     return {
       passed: false,

@@ -74,7 +74,8 @@ function calculateMomentum(bars: BarData[], periods = 5): number {
 }
 
 // Check if volume is above average
-function hasVolumeConfirmation(bars: BarData[], threshold = 1.2): boolean {
+// PRO: Increased threshold from 1.2 to 1.5 (150% of average) for stronger confirmation
+function hasVolumeConfirmation(bars: BarData[], threshold = 1.5): boolean {
   if (bars.length < 10) return false;
   
   const avgVolume = bars.slice(0, -1).reduce((sum, b) => sum + b.volume, 0) / (bars.length - 1);
@@ -139,10 +140,12 @@ export async function validateTrade(
   }
   
   try {
-    // Get 5-minute bars for intraday analysis
-    const bars5min = await alpaca.getBars(symbol, "5Min", 20);
-    // Get 1-minute bars for short-term momentum
-    const bars1min = await alpaca.getBars(symbol, "1Min", 10);
+    // Get 5-minute bars for intraday analysis (with warm-start for reliability)
+    const bars5minResult = await alpaca.getBarsSafe(symbol, "5Min", 10);
+    const bars5min = bars5minResult.bars;
+    // Get 1-minute bars for short-term momentum (with warm-start for reliability)
+    const bars1minResult = await alpaca.getBarsSafe(symbol, "1Min", 5);
+    const bars1min = bars1minResult.bars;
     // Get current price
     const quote = await alpaca.getLatestQuote(symbol);
     
@@ -217,9 +220,9 @@ export async function validateTrade(
     if (trendAlignment) score += 10;
     else score -= 5; // Reduced penalty - sideways can still work
     
-    // Volume confirmation (+/- 10 points)
-    if (volumeOk) score += 10;
-    else score -= 5; // Reduced penalty - after hours always has low volume
+    // Volume confirmation (+/- 15 points) - PRO: Increased importance
+    if (volumeOk) score += 15;
+    else score -= 10; // PRO: Increased penalty for weak volume
     
     // Price vs VWAP alignment (+/- 10 points)
     if (side === "buy" && priceVsVwap === "below") score += 10;
@@ -239,16 +242,17 @@ export async function validateTrade(
       if (priceVsVwap !== "below") score -= 5; // Reduced from 20
       if (momentum < -2) score -= 5; // Reduced penalty
     } else if (strategyType === "breakout") {
-      if (!volumeOk) score -= 5; // Reduced from 20
+      // PRO: MANDATORY volume for breakouts (blocks fake breakouts)
+      if (!volumeOk) score -= 25; // Increased from 5 - breakouts NEED volume
       if (Math.abs(momentum) < 0.3) score -= 5; // Reduced from 15
     }
     
     // Clamp score
     score = Math.max(0, Math.min(100, score));
     
-    // LOWERED THRESHOLD: Require score >= 35 for approval (was 65)
-    // Changed 2026-01-31: Allow trades with minor flags (e.g., weak volume only)
-    const APPROVAL_THRESHOLD = 35;
+    // PRO: Raised threshold from 35 to 45 - filter weak setups
+    // Volume confirmation is now more heavily weighted
+    const APPROVAL_THRESHOLD = 45;
     const approved = score >= APPROVAL_THRESHOLD;
     
     // Build flags array (always computed, even for approved trades)
@@ -307,8 +311,9 @@ export async function checkMarketConditions(): Promise<{
   console.log("[TradeValidator] Checking market conditions...");
   
   try {
-    // Check SPY for overall market trend
-    const spyBars = await alpaca.getBars("SPY", "5Min", 12);
+    // Check SPY for overall market trend (with warm-start for reliability)
+    const spyBarResult = await alpaca.getBarsSafe("SPY", "5Min", 10);
+    const spyBars = spyBarResult.bars;
     
     // If we can't get SPY bars, still allow trading - don't block
     // The market is open, we should trade
@@ -399,7 +404,8 @@ export async function calculatePositionSize(
   positionValue: number;
 }> {
   try {
-    const bars = await alpaca.getBars(symbol, "5Min", 14);
+    const barResult = await alpaca.getBarsSafe(symbol, "5Min", 5);
+    const bars = barResult.bars;
     const quote = await alpaca.getLatestQuote(symbol);
     
     if (bars.length < 5 || !quote.price) {

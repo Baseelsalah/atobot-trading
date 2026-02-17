@@ -100,13 +100,13 @@ export class MemStorage implements IStorage {
       id: randomUUID(),
       isActive: false,
       isPaperTrading: true,
-      maxPositionSize: 1000,
-      maxDailyLoss: 500,
-      maxPositions: 5,
-      stopLossPercent: 2,
-      takeProfitPercent: 5,
+      maxPositionSize: 700000, // 700% of $100K — balanced leverage (backtested: PF 3.10, $8.5K/month, -7.3% max DD)
+      maxDailyLoss: 50000, // Reasonable circuit breaker for 700% leverage
+      maxPositions: 5, // 5 concurrent positions for frequent trading
+      stopLossPercent: 1.2, // MAXIMUM: Tighter 1.2% stops for precise risk control
+      takeProfitPercent: 4, // MAXIMUM: 4% targets for bigger wins
       tradingHoursOnly: true,
-      analysisInterval: 300,
+      analysisInterval: 180, // PRO: Scan every 3 minutes (was 5 min) for faster reaction
       updatedAt: new Date(),
     };
   }

@@ -9,7 +9,7 @@ import {
 
 // REMOVED: Daily profit goal forcing logic - don't size up or trade more because we're "behind goal"
 // Keep only hard safety limits (max daily loss)
-const MAX_DAILY_LOSS = 500; // Hard stop - halt trading if daily loss exceeds this
+const MAX_DAILY_LOSS = 50000; // Aligned with storage.ts maxDailyLoss — raised for 700% leverage (avg loss ~$4K)
 
 // DISPLAY ONLY: Daily profit goal for UI display (not used for forcing trades)
 const DAILY_PROFIT_GOAL = 3000; // Display target only - no behavioral impact
@@ -288,17 +288,38 @@ export async function getHungerState(): Promise<HungerState> {
   const dailyLoss = currentProfit < 0 ? Math.abs(currentProfit) : 0;
   const atDailyLossLimit = dailyLoss >= MAX_DAILY_LOSS;
   
+  // PRO: SMART POSITION SIZING - Reduce after losses, increase after wins
+  // This is the OPPOSITE of hunger-driven sizing (which was dangerous)
+  let smartMultiplier = 1.0;
+
+  // After 2+ consecutive losses: REDUCE size by 30%
+  if (warriorState.conquestStreak <= -2) {
+    smartMultiplier = 0.7;
+  }
+  // After 1 loss: REDUCE size by 15%
+  else if (warriorState.conquestStreak === -1) {
+    smartMultiplier = 0.85;
+  }
+  // After 3+ consecutive wins: INCREASE size by 20%
+  else if (warriorState.conquestStreak >= 3) {
+    smartMultiplier = 1.2;
+  }
+  // After 2 consecutive wins: INCREASE size by 10%
+  else if (warriorState.conquestStreak === 2) {
+    smartMultiplier = 1.1;
+  }
+
   // NEUTRAL STATE: No forcing based on profit goals
-  // Position sizing and thresholds stay constant
+  // Position sizing adjusts based on win/loss streaks (smart risk management)
   return {
     hungerLevel: atDailyLossLimit ? "full" : "fed", // "full" means stop trading
     urgency: 0,
     aggressiveness: 0.5, // Neutral - no aggressive sizing
-    positionSizeMultiplier: 1.0, // NO BOOST - consistent sizing
+    positionSizeMultiplier: smartMultiplier, // PRO: Smart sizing based on streaks
     thresholdReduction: 0, // NO THRESHOLD REDUCTION - maintain standards
-    message: atDailyLossLimit 
+    message: atDailyLossLimit
       ? `HARD STOP: Daily loss limit reached ($${dailyLoss.toFixed(0)}/$${MAX_DAILY_LOSS}). Trading paused.`
-      : `P&L: $${currentProfit.toFixed(0)} | Trading with consistent position sizing.`,
+      : `P&L: $${currentProfit.toFixed(0)} | Smart sizing: ${(smartMultiplier * 100).toFixed(0)}% (streak: ${warriorState.conquestStreak})`,
     profitNeeded: 0, // No goal forcing
     timeRemainingHours,
     profitPerHourNeeded: 0,
@@ -417,9 +438,10 @@ export function updatePositionTracker(symbol: string, currentPrice: number): Pos
     tracker.peakProfit = profitDollars;
   }
   
-  if (profitPercent >= 1.0 && !tracker.breakEvenStop) {
-    tracker.breakEvenStop = tracker.entryPrice * 1.001;
-    console.log(`[ProfitManager] ${symbol}: Breakeven stop activated @ $${tracker.breakEvenStop.toFixed(2)}`);
+  // PRO: Activate breakeven stop at 0.3% gain (was 1.0%) - faster profit protection
+  if (profitPercent >= 0.3 && !tracker.breakEvenStop) {
+    tracker.breakEvenStop = tracker.entryPrice * 1.0005; // Set stop at entry + 0.05%
+    console.log(`[ProfitManager] ${symbol}: Breakeven stop activated @ $${tracker.breakEvenStop.toFixed(2)} (PRO: early protection)`);
   }
   
   if (profitPercent >= 1.5 && !tracker.trailingStop) {
@@ -571,14 +593,14 @@ export async function shouldContinueTrading(): Promise<{ allowed: boolean; reaso
     return { allowed: false, reason: `HARD STOP: Daily loss limit ($${MAX_DAILY_LOSS}) reached: $${goalState.currentProfit.toFixed(2)}` };
   }
   
-  // SOFT LIMIT: Max daily trades
-  if (todayPerformance.totalTrades >= 8) {
-    return { allowed: false, reason: `Max daily trades (8) reached` };
+  // SOFT LIMIT: Max daily trades - aligned with riskEngine MAX_TRADES_PER_DAY
+  if (todayPerformance.totalTrades >= 20) {
+    return { allowed: false, reason: `Max daily trades (20) reached` };
   }
   
-  // SOFT LIMIT: Consecutive losses
-  if (todayPerformance.consecutiveLosses >= 3) {
-    return { allowed: false, reason: `3 consecutive losses - take a break` };
+  // SOFT LIMIT: Consecutive losses - aligned with riskEngine MAX_CONSECUTIVE_LOSSES
+  if (todayPerformance.consecutiveLosses >= 4) {
+    return { allowed: false, reason: `4 consecutive losses - take a break` };
   }
   
   // SOFT LIMIT: Negative expectancy 

@@ -975,8 +975,8 @@ export async function updateDailyPLFromPositions(): Promise<void> {
 }
 
 export async function shouldStopTradingToday(): Promise<boolean> {
-  const maxDailyLoss = -200;
-  const maxDailyTrades = 8;
+  const maxDailyLoss = -50000; // Aligned with storage.ts maxDailyLoss — raised for 700% leverage
+  const maxDailyTrades = 20; // Aligned with riskEngine MAX_TRADES_PER_DAY
   
   // Refresh P/L from current positions
   await updateDailyPLFromPositions();

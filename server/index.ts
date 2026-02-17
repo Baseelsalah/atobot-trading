@@ -10,6 +10,8 @@ import * as activityLedger from "./activityLedger";
 import * as tradeAccounting from "./tradeAccounting";
 import * as reportStorage from "./reportStorage";
 import * as envScopeModule from "./envScope";
+import { initDatabase } from "./database";
+import { registerAuthRoutes, requireAuth } from "./auth";
 
 // BOOT LOG: Durable startup log with pid and version
 function logBoot(): void {
@@ -98,6 +100,20 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// CORS: Allow dashboard on port 3000 to call API on port 5000
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -210,6 +226,18 @@ app.get("/readiness", async (_req, res) => {
 });
 
 (async () => {
+  // Initialize SQLite database
+  initDatabase();
+
+  // Register auth routes (public: /api/auth/*)
+  registerAuthRoutes(app);
+
+  // Protect all /api/* routes (except /api/auth/*) with JWT auth
+  app.use("/api", (req, res, next) => {
+    if (req.path.startsWith("/auth/")) return next();
+    requireAuth(req, res, next);
+  });
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

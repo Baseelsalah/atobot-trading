@@ -17,9 +17,9 @@ let callbackRegistered = false;
 
 // P3 Risk Engine Configuration
 export const RISK_ENGINE_CONFIG = {
-  // Position Sizing
-  RISK_PER_TRADE_PCT: 0.0025,    // 0.25% of equity risked per trade (paper safe)
-  MAX_POSITION_PCT: 0.075,       // 7.5% max position size cap
+  // Position Sizing — 700% cap = ~$8.5K/month backtested, PF 3.10, -7.3% max DD
+  RISK_PER_TRADE_PCT: 1.00,        // 100% — cap is always the binding constraint
+  MAX_POSITION_PCT: 7.00,           // 700% max position size — balanced leverage for $5K+/month target
   MIN_NOTIONAL: 100,             // Minimum notional value ($100)
   
   // ATR-based stops
@@ -40,8 +40,8 @@ export const RISK_ENGINE_CONFIG = {
   KILLSWITCH_COOLDOWN_HOURS: 4,  // Disabled for this many hours
   
   // Daily safety controls
-  MAX_TRADES_PER_DAY: 6,
-  MAX_CONSECUTIVE_LOSSES: 3,
+  MAX_TRADES_PER_DAY: 20, // MAXIMUM: Increased from 6 to 20 for profit maximization
+  MAX_CONSECUTIVE_LOSSES: 2, // Tighter circuit breaker — proven optimal in 6-month backtest
 };
 
 // Track kill-switch state

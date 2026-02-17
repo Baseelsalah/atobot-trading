@@ -25,6 +25,8 @@ import * as leaderLock from "./leaderLock";
 import * as tradabilityGates from "./tradabilityGates";
 import * as executionTrace from "./executionTrace";
 import * as envScope from "./envScope";
+import { requireAdmin, requireApproved } from "./auth";
+import * as accountManager from "./accountManager";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -42,32 +44,41 @@ export async function registerRoutes(
     dayTradesRemaining: 3,
   };
 
-  // Portfolio endpoints
+  // Portfolio endpoints (user-scoped: uses logged-in user's Alpaca keys)
   app.get("/api/portfolio", async (req, res) => {
     try {
-      // Always try to fetch real Alpaca data first when configured
-      if (alpaca.isConfigured()) {
-        try {
-          const account = await alpaca.getAccount();
-          const equity = parseFloat(account.equity);
-          const lastEquity = parseFloat(account.last_equity);
-          const todayPL = equity - lastEquity;
-          const todayPLPercent = lastEquity > 0 ? (todayPL / lastEquity) * 100 : 0;
+      // Get user's Alpaca credentials
+      const userKeys = req.user ? accountManager.getUserDecryptedKeys(req.user.id) : null;
+      if (userKeys) {
+        alpaca.setActiveCredentials(userKeys.key, userKeys.secret);
+      }
 
-          return res.json({
-            totalEquity: equity,
-            buyingPower: parseFloat(account.buying_power),
-            cash: parseFloat(account.cash),
-            todayPL,
-            todayPLPercent,
-            totalPL: todayPL,
-            totalPLPercent: todayPLPercent,
-            dayTradesRemaining: 3 - account.daytrade_count,
-          });
-        } catch (alpacaError) {
-          console.error("Alpaca API error, falling back to local calculation:", alpacaError);
-          // Fall through to local calculation
+      try {
+        // Always try to fetch real Alpaca data first when configured
+        if (alpaca.isConfigured()) {
+          try {
+            const account = await alpaca.getAccount();
+            const equity = parseFloat(account.equity);
+            const lastEquity = parseFloat(account.last_equity);
+            const todayPL = equity - lastEquity;
+            const todayPLPercent = lastEquity > 0 ? (todayPL / lastEquity) * 100 : 0;
+
+            return res.json({
+              totalEquity: equity,
+              buyingPower: parseFloat(account.buying_power),
+              cash: parseFloat(account.cash),
+              todayPL,
+              todayPLPercent,
+              totalPL: todayPL,
+              totalPLPercent: todayPLPercent,
+              dayTradesRemaining: 3 - account.daytrade_count,
+            });
+          } catch (alpacaError) {
+            console.error("Alpaca API error, falling back to local calculation:", alpacaError);
+          }
         }
+      } finally {
+        if (userKeys) alpaca.clearActiveCredentials();
       }
       
       // Fallback: calculate from local positions and trades
@@ -104,29 +115,50 @@ export async function registerRoutes(
     }
   });
 
-  // Positions endpoints
+  // Positions endpoints (user-scoped)
   app.get("/api/positions", async (req, res) => {
     try {
-      // Always sync positions from Alpaca when configured (paper trading only blocks trades, not reading)
-      if (alpaca.isConfigured()) {
-        try {
-          const alpacaPositions = await alpaca.getPositions();
-          await storage.clearPositions();
-          for (const pos of alpacaPositions) {
-            await storage.upsertPosition({
-              symbol: pos.symbol,
-              quantity: parseInt(pos.qty),
-              avgEntryPrice: parseFloat(pos.avg_entry_price),
-              currentPrice: parseFloat(pos.current_price),
-              marketValue: parseFloat(pos.market_value),
-              unrealizedPL: parseFloat(pos.unrealized_pl),
-              unrealizedPLPercent: parseFloat(pos.unrealized_plpc) * 100,
-            });
+      const userKeys = req.user ? accountManager.getUserDecryptedKeys(req.user.id) : null;
+      if (userKeys) {
+        alpaca.setActiveCredentials(userKeys.key, userKeys.secret);
+      }
+
+      try {
+        if (alpaca.isConfigured()) {
+          try {
+            const alpacaPositions = await alpaca.getPositions();
+            // Return directly for non-admin users (don't pollute shared storage)
+            if (userKeys && req.user?.role !== "admin") {
+              return res.json(alpacaPositions.map((pos: any) => ({
+                id: 0,
+                symbol: pos.symbol,
+                quantity: parseInt(pos.qty),
+                avgEntryPrice: parseFloat(pos.avg_entry_price),
+                currentPrice: parseFloat(pos.current_price),
+                marketValue: parseFloat(pos.market_value),
+                unrealizedPL: parseFloat(pos.unrealized_pl),
+                unrealizedPLPercent: parseFloat(pos.unrealized_plpc) * 100,
+              })));
+            }
+            // Admin: sync into shared storage as before
+            await storage.clearPositions();
+            for (const pos of alpacaPositions) {
+              await storage.upsertPosition({
+                symbol: pos.symbol,
+                quantity: parseInt(pos.qty),
+                avgEntryPrice: parseFloat(pos.avg_entry_price),
+                currentPrice: parseFloat(pos.current_price),
+                marketValue: parseFloat(pos.market_value),
+                unrealizedPL: parseFloat(pos.unrealized_pl),
+                unrealizedPLPercent: parseFloat(pos.unrealized_plpc) * 100,
+              });
+            }
+          } catch (syncError) {
+            console.error("Failed to sync positions from Alpaca:", syncError);
           }
-        } catch (syncError) {
-          console.error("Failed to sync positions from Alpaca:", syncError);
-          // Fall through to return cached positions
         }
+      } finally {
+        if (userKeys) alpaca.clearActiveCredentials();
       }
       const positions = await storage.getPositions();
       res.json(positions);
@@ -274,7 +306,7 @@ export async function registerRoutes(
     }
   });
 
-  // Bot control endpoints
+  // Bot control endpoints (admin only, except status)
   app.get("/api/bot/status", async (req, res) => {
     try {
       const status = tradingBot.getBotStatus();
@@ -284,7 +316,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bot/start", async (req, res) => {
+  app.post("/api/bot/start", requireAdmin, async (req, res) => {
     try {
       await tradingBot.startBot();
       res.json({ success: true });
@@ -294,7 +326,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bot/pause", async (req, res) => {
+  app.post("/api/bot/pause", requireAdmin, async (req, res) => {
     try {
       await tradingBot.pauseBot();
       res.json({ success: true });
@@ -303,7 +335,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bot/stop", async (req, res) => {
+  app.post("/api/bot/stop", requireAdmin, async (req, res) => {
     try {
       await tradingBot.stopBot();
       res.json({ success: true });
@@ -312,7 +344,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bot/analyze", async (req, res) => {
+  app.post("/api/bot/analyze", requireAdmin, async (req, res) => {
     try {
       await tradingBot.runAnalysis();
       res.json({ success: true });
@@ -391,8 +423,8 @@ export async function registerRoutes(
     }
   });
 
-  // Emergency close all positions endpoint
-  app.post("/api/trading/emergency-close", async (req, res) => {
+  // Emergency close all positions endpoint (admin only)
+  app.post("/api/trading/emergency-close", requireAdmin, async (req, res) => {
     try {
       const result = await timeGuard.closeAllPositionsNow("Manual emergency close requested");
       res.json({ success: true, ...result });
@@ -441,7 +473,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/settings", async (req, res) => {
+  app.patch("/api/settings", requireAdmin, async (req, res) => {
     try {
       const settings = await storage.updateSettings(req.body);
       res.json(settings);

@@ -3,8 +3,9 @@ import * as indicators from "./indicators";
 import { storage } from "./storage";
 import { DAY_TRADER_CONFIG } from "./dayTraderConfig";
 
-const PARTIAL_PROFIT_PCT = 0.33;
-const TRADE_TIMEOUT_MINUTES = 15;
+const PARTIAL_PROFIT_PCT = 0.33;  // Proven balanced profit capture
+const TRADE_TIMEOUT_MINUTES = 30;  // Proven value — 60 min timeouts were losers
+const PARTIAL_PROFIT_R_MULTIPLE = 0.5;  // Take partial at +0.5R to activate trailing stop
 
 interface ManagedPosition {
   symbol: string;
@@ -211,13 +212,13 @@ function checkBreakevenRule(symbol: string, managed: ManagedPosition, currentPri
 async function checkPartialProfit(symbol: string, managed: ManagedPosition, currentPrice: number, currentQty: number): Promise<boolean> {
   if (managed.partialTaken) return false;
   
-  const profitTarget = managed.entryPrice + managed.rValue;
+  const profitTarget = managed.entryPrice + managed.rValue * PARTIAL_PROFIT_R_MULTIPLE;
   const tradeIdLog = managed.tradeId ? ` trade_id=${managed.tradeId}` : "";
-  
+
   if (currentPrice >= profitTarget) {
     const qtyToSell = Math.max(1, Math.floor(currentQty * PARTIAL_PROFIT_PCT));
-    
-    console.log(`[PositionManager] ${symbol} +1R reached! Taking ${PARTIAL_PROFIT_PCT * 100}% profit (${qtyToSell} shares)${tradeIdLog}`);
+
+    console.log(`[PositionManager] ${symbol} +${PARTIAL_PROFIT_R_MULTIPLE}R reached! Taking ${PARTIAL_PROFIT_PCT * 100}% profit (${qtyToSell} shares)${tradeIdLog}`);
     
     try {
       // Use trade_id with _PARTIAL suffix for partial exits
@@ -250,7 +251,8 @@ async function checkTrailingStop(symbol: string, managed: ManagedPosition, curre
   if (!managed.trailingActive) return;
   
   try {
-    const bars = await alpaca.getBars(symbol, "1Min", 20);
+    const barResult = await alpaca.getBarsSafe(symbol, "1Min", 10);
+    const bars = barResult.bars;
     
     if (bars.length < 10) return;
     

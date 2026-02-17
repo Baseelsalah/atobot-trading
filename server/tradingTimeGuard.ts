@@ -17,7 +17,7 @@ if (TIME_GUARD_OVERRIDE) {
  * 
  * ENTRY WINDOW (NEW POSITIONS ALLOWED):
  *   START: 9:35 AM ET (5 minutes after market opens)
- *   END:   Dynamic - min(11:35 AM ET, next_close - 5 minutes)
+ *   END:   Dynamic - min(2:00 PM ET, next_close - 5 minutes)
  * 
  * POSITION MANAGEMENT WINDOW:
  *   Entry cutoff - Force close: Manage existing positions only
@@ -41,8 +41,8 @@ if (TIME_GUARD_OVERRIDE) {
 // ENTRY WINDOW (LEGACY - used as max bounds)
 const ENTRY_START_HOUR_ET = 9;
 const ENTRY_START_MINUTE_ET = 35;
-const LEGACY_ENTRY_CUTOFF_HOUR_ET = 11;
-const LEGACY_ENTRY_CUTOFF_MINUTE_ET = 35;
+const LEGACY_ENTRY_CUTOFF_HOUR_ET = 14; // Extended to 2:00 PM ET — proven in backtest for more EMA crossover opportunities
+const LEGACY_ENTRY_CUTOFF_MINUTE_ET = 0;
 
 // FORCE CLOSE (LEGACY - used as max bounds)
 const LEGACY_FORCE_CLOSE_HOUR_ET = 15;

@@ -64,6 +64,14 @@ if (SIM_TIME_ET) {
 }
 
 /**
+ * Set simulation time dynamically (for backtesting)
+ * Pass null to clear and return to real time
+ */
+export function setSimTime(date: Date | null): void {
+  simTimeDate = date;
+}
+
+/**
  * Check if simulation time is active
  */
 export function isSimTimeActive(): boolean {

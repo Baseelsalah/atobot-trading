@@ -259,6 +259,25 @@ interface AlpacaBar {
 const ALPACA_API_KEY = process.env.ALPACA_API_KEY;
 const ALPACA_API_SECRET = process.env.ALPACA_API_SECRET || process.env.ALPACA_SECRET_KEY;
 
+// Multi-user credential switching
+let activeCredentials: { key: string; secret: string } | null = null;
+
+export function setActiveCredentials(key: string, secret: string): void {
+  activeCredentials = { key, secret };
+}
+
+export function clearActiveCredentials(): void {
+  activeCredentials = null;
+}
+
+function getEffectiveKey(): string {
+  return activeCredentials?.key || ALPACA_API_KEY || "";
+}
+
+function getEffectiveSecret(): string {
+  return activeCredentials?.secret || ALPACA_API_SECRET || "";
+}
+
 // Debug: Log if keys are present (not the actual values)
 console.log(`[Alpaca] API Key present: ${!!ALPACA_API_KEY}, length: ${ALPACA_API_KEY?.length || 0}`);
 console.log(`[Alpaca] API Secret present: ${!!ALPACA_API_SECRET}, length: ${ALPACA_API_SECRET?.length || 0}`);
@@ -340,8 +359,8 @@ async function alpacaRequest<T>(
         ...options,
         signal: controller.signal,
         headers: {
-          "APCA-API-KEY-ID": ALPACA_API_KEY || "",
-          "APCA-API-SECRET-KEY": ALPACA_API_SECRET || "",
+          "APCA-API-KEY-ID": getEffectiveKey(),
+          "APCA-API-SECRET-KEY": getEffectiveSecret(),
           "Content-Type": "application/json",
           ...options.headers,
         },
@@ -1321,6 +1340,7 @@ export async function getBarsSafe(
 }
 
 export function isConfigured(): boolean {
+  if (activeCredentials) return true;
   return !!(ALPACA_API_KEY && ALPACA_API_SECRET);
 }
 

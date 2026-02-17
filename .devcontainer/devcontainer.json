@@ -1,0 +1,3 @@
+{
+  "postStartCommand": "cd /workspaces/atobot-trading && npm install --silent && npx pm2 resurrect --no-daemon 2>/dev/null; npx pm2 start ecosystem.config.cjs 2>/dev/null; npx pm2 save; echo '[AUTOSTART] Bot started via PM2'"
+}

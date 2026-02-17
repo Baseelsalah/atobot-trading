@@ -13,8 +13,9 @@
  */
 
 // Configurable deadband threshold: block only if bearish spread >= this value
-// 0.10 = 0.10% spread required to block (prevents blocking on 0.006% noise)
-export const REGIME_MIN_EMA_SPREAD_PCT = 0.10;
+// 0.30 = 0.30% spread required to block (relaxed for more trading opportunities)
+// PRO DAY TRADING: Allow trading in most conditions, only block severe bearish trends
+export const REGIME_MIN_EMA_SPREAD_PCT = 0.30;
 
 import * as alpaca from "./alpaca";
 import { ema } from "./indicators";
@@ -32,15 +33,16 @@ export interface RegimeResult {
 
 export async function evaluateMarketRegime(): Promise<RegimeResult> {
   try {
-    const spyBars = await alpaca.getBars("SPY", "5Min", 50);
-    
-    if (!spyBars || spyBars.length < 21) {
-      console.log(`[RegimeFilter] SPY bars missing or insufficient (${spyBars?.length ?? 0} bars)`);
+    const barResult = await alpaca.getBarsSafe("SPY", "5Min", 21);
+
+    if (!barResult.ok || !barResult.bars || barResult.bars.length < 21) {
+      console.log(`[RegimeFilter] SPY bars missing or insufficient (${barResult.bars?.length ?? 0} bars, reason: ${barResult.reason ?? "unknown"})`);
       return {
         ok: false,
         reasons: ["regime:missing"],
       };
     }
+    const spyBars = barResult.bars;
     
     const closes = spyBars.map(b => b.c);
     
@@ -64,26 +66,26 @@ export async function evaluateMarketRegime(): Promise<RegimeResult> {
     const emaSpreadPct = Math.abs(latestEma9 - latestEma21) / latestEma21 * 100;
     
     // Determine regime label: bull, bear, or chop
-    // Chop = EMA spread < 0.15% (very tight, no clear direction)
+    // Chop = EMA spread < 0.08% (very tight, no clear direction)
     const regimeLabel: RegimeLabel = determineRegimeLabel(latestEma9, latestEma21);
-    
+
+    // Block chop regime — backtest showed 57% of trades in chop lost $9,433
+    if (regimeLabel === "chop") {
+      console.log(`[RegimeFilter] SPY chop: EMA9=${latestEma9.toFixed(2)} EMA21=${latestEma21.toFixed(2)} spread=${emaSpreadPct.toFixed(3)}% reason=regime:chop BLOCK_TRADING`);
+      return {
+        ok: false,
+        reasons: ["regime:chop"],
+        ema9: latestEma9,
+        ema21: latestEma21,
+        regimeLabel,
+        emaSpreadPct,
+      };
+    }
+
     if (!isBullish) {
-      // REGIME-DEADBAND-1: Check if spread is below threshold (noise)
-      if (emaSpreadPct < REGIME_MIN_EMA_SPREAD_PCT) {
-        // Deadband: EMA9 < EMA21 but spread too small to be meaningful
-        console.log(`[RegimeFilter] SPY deadband: EMA9=${latestEma9.toFixed(2)} EMA21=${latestEma21.toFixed(2)} spread=${emaSpreadPct.toFixed(3)}% < threshold=${REGIME_MIN_EMA_SPREAD_PCT}% reason=regime:deadband_bearish ALLOW_TRADING`);
-        return {
-          ok: true,
-          reasons: ["regime:deadband_bearish"],
-          ema9: latestEma9,
-          ema21: latestEma21,
-          regimeLabel: "chop", // Treat deadband as chop
-          emaSpreadPct,
-        };
-      }
-      
-      // Spread >= threshold: meaningful bearish, block trading
-      console.log(`[RegimeFilter] SPY bearish: EMA9=${latestEma9.toFixed(2)} EMA21=${latestEma21.toFixed(2)} spread=${emaSpreadPct.toFixed(3)}% >= threshold=${REGIME_MIN_EMA_SPREAD_PCT}% reason=regime:spyBearish BLOCK_TRADING`);
+      // Block ALL bearish conditions (including deadband) — only trade in confirmed bull
+      // Backtest showed bear deadband trades lost $513 on 85 trades
+      console.log(`[RegimeFilter] SPY bearish: EMA9=${latestEma9.toFixed(2)} EMA21=${latestEma21.toFixed(2)} spread=${emaSpreadPct.toFixed(3)}% reason=regime:spyBearish BLOCK_TRADING`);
       return {
         ok: false,
         reasons: ["regime:spyBearish"],
@@ -134,18 +136,19 @@ export function getRegimeStatus(result: RegimeResult): string {
  * Determine regime label: bull, bear, or chop
  * - bull: EMA9 >= EMA21
  * - bear: EMA9 < EMA21
- * - chop: EMA spread < 0.15% (very tight, no clear direction)
+ * - chop: EMA spread < 0.08% (very tight, no clear direction)
+ * PRO DAY TRADING: Reduced from 0.15% to 0.08% to classify less as chop
  */
 export function determineRegimeLabel(ema9: number, ema21: number): RegimeLabel {
   const emaSpreadPct = Math.abs(ema9 - ema21) / ema21 * 100;
-  
+
   // Chop threshold: very tight spread indicates no clear trend
-  const CHOP_THRESHOLD_PCT = 0.15;
-  
+  const CHOP_THRESHOLD_PCT = 0.08; // PRO: Lowered from 0.15% to allow more directional trades
+
   if (emaSpreadPct < CHOP_THRESHOLD_PCT) {
     return "chop";
   }
-  
+
   return ema9 >= ema21 ? "bull" : "bear";
 }
 

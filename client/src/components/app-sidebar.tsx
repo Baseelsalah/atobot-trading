@@ -18,7 +18,6 @@ import {
   Zap,
 } from "lucide-react";
 import type { BotStatus } from "@shared/schema";
-import atobotLogo from "@assets/image_1765928074885.png";
 
 interface AppSidebarProps {
   botStatus: BotStatus;
@@ -64,11 +63,9 @@ export function AppSidebar({ botStatus }: AppSidebarProps) {
       <SidebarHeader className="p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <img 
-              src={atobotLogo} 
-              alt="AtoBot Logo" 
-              className="h-9 w-auto object-contain"
-            />
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary-foreground" />
+            </div>
             {botStatus.status === "active" && (
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-sidebar animate-pulse" />
             )}

@@ -1,0 +1,35 @@
+name: Wake Codespace for Trading
+
+on:
+  schedule:
+    # Run at 9:00 AM ET (14:00 UTC) Monday-Friday
+    # This gives the bot 30 minutes to boot before market open at 9:30 AM ET
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Codespace
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the codespace for this repo
+          CODESPACE=$(gh codespace list --repo ${{ github.repository }} --json name,state -q '.[0].name')
+          STATE=$(gh codespace list --repo ${{ github.repository }} --json name,state -q '.[0].state')
+
+          if [ -z "$CODESPACE" ]; then
+            echo "No codespace found for this repo"
+            exit 1
+          fi
+
+          echo "Codespace: $CODESPACE (state: $STATE)"
+
+          if [ "$STATE" = "Shutdown" ] || [ "$STATE" = "ShuttingDown" ]; then
+            echo "Starting codespace..."
+            gh codespace start -c "$CODESPACE"
+            echo "Codespace started. Bot will auto-launch via postStartCommand."
+          else
+            echo "Codespace already running (state: $STATE). No action needed."
+          fi
