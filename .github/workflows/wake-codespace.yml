@@ -2,9 +2,11 @@ name: Wake Codespace for Trading
 
 on:
   schedule:
-    # Run at 9:00 AM ET (14:00 UTC) Monday-Friday
-    # This gives the bot 30 minutes to boot before market open at 9:30 AM ET
-    - cron: '0 14 * * 1-5'
+    # Run at 12:30 UTC (7:30 AM EST / 8:30 AM EDT) Monday-Friday
+    # This ensures the Codespace is fully booted and cron jobs are installed
+    # at least 1 hour before the pre-market routine fires (13:30 UTC / 8:30 AM EST)
+    # and before market open (9:30 AM ET) regardless of DST.
+    - cron: '30 12 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
