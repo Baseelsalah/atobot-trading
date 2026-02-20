@@ -10,6 +10,8 @@ on:
 jobs:
   wake:
     runs-on: ubuntu-latest
+    permissions:
+      codespaces: write
     steps:
       - name: Start Codespace
         env:
