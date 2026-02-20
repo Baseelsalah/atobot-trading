@@ -2,19 +2,35 @@ name: Wake Codespace for Trading
 
 on:
   schedule:
-    # Run at 9:00 AM ET (14:00 UTC) Monday-Friday
-    # This gives the bot 30 minutes to boot before market open at 9:30 AM ET
-    - cron: '0 14 * * 1-5'
+    # Run at 12:30 UTC (7:30 AM EST / 8:30 AM EDT) Monday-Friday
+    # This ensures the Codespace is fully booted and cron jobs are installed
+    # at least 1 hour before the pre-market routine fires (13:30 UTC / 8:30 AM EST)
+    # and before market open (9:30 AM ET) regardless of DST.
+    - cron: '30 12 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
   wake:
     runs-on: ubuntu-latest
+    permissions:
+      codespaces: write
     steps:
       - name: Start Codespace
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN cannot manage codespaces — a Personal Access Token with
+          # 'codespace' scope is required.
+          # Create one at https://github.com/settings/tokens and store it as a
+          # repository secret named CODESPACE_PAT.
+          GH_TOKEN: ${{ secrets.CODESPACE_PAT }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::CODESPACE_PAT secret is not set."
+            echo "Create a Personal Access Token with 'codespace' scope at"
+            echo "https://github.com/settings/tokens and add it as a repository"
+            echo "secret named CODESPACE_PAT."
+            exit 1
+          fi
+
           # Find the codespace for this repo
           CODESPACE=$(gh codespace list --repo ${{ github.repository }} --json name,state -q '.[0].name')
           STATE=$(gh codespace list --repo ${{ github.repository }} --json name,state -q '.[0].state')
@@ -26,10 +42,17 @@ jobs:
 
           echo "Codespace: $CODESPACE (state: $STATE)"
 
-          if [ "$STATE" = "Shutdown" ] || [ "$STATE" = "ShuttingDown" ]; then
-            echo "Starting codespace..."
-            gh codespace start -c "$CODESPACE"
-            echo "Codespace started. Bot will auto-launch via postStartCommand."
-          else
-            echo "Codespace already running (state: $STATE). No action needed."
-          fi
+          case "$STATE" in
+            Shutdown|ShuttingDown|Failed|Unavailable)
+              echo "Starting codespace..."
+              gh codespace start -c "$CODESPACE"
+              echo "Codespace started. Bot will auto-launch via postStartCommand."
+              ;;
+            Available|Starting)
+              echo "Codespace already running or starting (state: $STATE). No action needed."
+              ;;
+            *)
+              echo "Codespace in unexpected state: $STATE. Attempting to start..."
+              gh codespace start -c "$CODESPACE"
+              ;;
+          esac
