@@ -1,0 +1,39 @@
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── Environment (secrets — NEVER bake into image) ────────────────────────────
+.env
+
+# ── Data / Logs (mounted as volumes, not baked into image) ───────────────────
+data/
+logs/
+
+# ── Tests / Dev ───────────────────────────────────────────────────────────────
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# ── Backtest artifacts ────────────────────────────────────────────────────────
+backtest*.py
+backtest_results*.txt
+scripts/
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.md
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db

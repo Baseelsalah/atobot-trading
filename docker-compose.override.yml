@@ -1,0 +1,30 @@
+# ── Local Development Override ────────────────────────────────────────────────
+# Overrides for running locally / on your laptop.
+# Docker Compose automatically merges this with docker-compose.yml.
+#
+# Usage: docker compose up bot    (auto-merges both files)
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    image: atobot:local
+    volumes:
+      # Bind-mount for local development (see live file changes)
+      - ./data:/app/data
+      - ./logs:/app/logs
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  dashboard:
+    build: .
+    image: atobot:local
+    volumes:
+      - ./data:/app/data
+
+  # Disable watchtower locally
+  watchtower:
+    profiles:
+      - production

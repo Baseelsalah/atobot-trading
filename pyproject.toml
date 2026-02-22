@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "atobot-trading"
+version = "1.0.0"
+description = "AtoBot – Automated Crypto Trading Bot"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    "pydantic>=2.5,<3",
+    "pydantic-settings>=2.1,<3",
+    "python-binance>=1.0.19,<2",
+    "alpaca-py>=0.30,<1",
+    "loguru>=0.7,<1",
+    "aiohttp>=3.9,<4",
+    "pandas>=2.1,<3",
+    "numpy>=1.26",
+    "SQLAlchemy>=2.0,<3",
+    "aiosqlite>=0.19,<1",
+    "streamlit>=1.30,<2",
+    "matplotlib>=3.8,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4,<9",
+    "pytest-asyncio>=0.23,<1",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+atobot = "src.main:main"
+
+# ── Pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+# ── Ruff ──────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+# ── Mypy ──────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true

@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  # ── Trading Bot ───────────────────────────────────────────────────────────
+  bot:
+    image: ghcr.io/${GITHUB_USER:-atobot}/atobot:latest
+    build: .
+    container_name: atobot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - bot-data:/app/data
+      - bot-logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - atobot-net
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ── Streamlit Dashboard ──────────────────────────────────────────────────
+  dashboard:
+    image: ghcr.io/${GITHUB_USER:-atobot}/atobot:latest
+    build: .
+    container_name: atobot-dashboard
+    restart: unless-stopped
+    env_file: .env
+    command: ["streamlit", "run", "src/dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    ports:
+      - "8501:8501"
+    volumes:
+      - bot-data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    depends_on:
+      - bot
+    networks:
+      - atobot-net
+
+  # ── Watchtower — auto-pulls new images & restarts containers ─────────────
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_STOPPED=false
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    networks:
+      - atobot-net
+
+volumes:
+  bot-data:
+  bot-logs:
+
+networks:
+  atobot-net:
+    driver: bridge
