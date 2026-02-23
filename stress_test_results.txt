@@ -1,0 +1,11 @@
+AtoBot Stress Test Results
+Run at: 2026-02-22 20:09:44.498420
+============================================================
+
+Best VWAP params:   Bounce=0.05%, TP=0.4%, SL=0.5%
+Best ORB params:    BO=0.04%, TP=0.6%, SL=0.3%
+Best trail params:  Act=0.3%, Dist=0.7%
+
+Deployed VWAP+ORB: $-4,195
+Optimized:         $-213
+VWAP-only best:    $+3,739

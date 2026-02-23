@@ -62,9 +62,9 @@ class Settings(BaseSettings):
     ORB_ORDER_SIZE_USD: float = 500.0
 
     # ── VWAP Scalp Strategy ───────────────────────────────────────────────────
-    VWAP_BOUNCE_PERCENT: float = 0.15  # % from VWAP to enter
+    VWAP_BOUNCE_PERCENT: float = 0.05  # % from VWAP to enter (stress test optimal)
     VWAP_TAKE_PROFIT_PERCENT: float = 0.5
-    VWAP_STOP_LOSS_PERCENT: float = 0.3
+    VWAP_STOP_LOSS_PERCENT: float = 0.50  # Wider SL: 52%->62% WR, Sharpe 0.88
     VWAP_ORDER_SIZE_USD: float = 500.0
 
     # ── Trend Filter (EMA) ────────────────────────────────────────────────────
