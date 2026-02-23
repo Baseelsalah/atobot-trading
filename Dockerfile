@@ -14,17 +14,11 @@ WORKDIR /app
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
 
-# Create non-root user
-RUN groupadd -r atobot && useradd -r -g atobot atobot
-
-# Create data & log directories
-RUN mkdir -p /app/data /app/logs && chown -R atobot:atobot /app
-
 # Copy source code
 COPY . .
 
-# Switch to non-root user
-USER atobot
+# Create data & log directories
+RUN mkdir -p /app/data /app/logs
 
 # Health-check: verify the process is running
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \

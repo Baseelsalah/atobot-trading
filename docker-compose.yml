@@ -51,6 +51,33 @@ services:
     networks:
       - atobot-net
 
+  # ── Guardian Agent — self-healing & auto-tuning watchdog ──────────────────
+  guardian:
+    image: ghcr.io/${GITHUB_USER:-atobot}/atobot:latest
+    build: .
+    container_name: atobot-guardian
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "src.guardian.agent"]
+    volumes:
+      - bot-data:/app/data
+      - bot-logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.15"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    depends_on:
+      - bot
+    networks:
+      - atobot-net
+
   # ── Watchtower — auto-pulls new images & restarts containers ─────────────
   watchtower:
     image: containrrr/watchtower
