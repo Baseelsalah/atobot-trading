@@ -5,8 +5,6 @@
 # Usage: docker compose up bot    (auto-merges both files)
 # ─────────────────────────────────────────────────────────────────────────────
 
-version: "3.9"
-
 services:
   bot:
     build: .
