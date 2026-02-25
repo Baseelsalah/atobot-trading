@@ -3,12 +3,13 @@
 Buys when price dips below VWAP by a configured percentage and sells
 when it bounces back to or above VWAP (mean-reversion scalp).
 
-**v3 research-driven** (backtest validated @ +$11,025 / 3mo):
+**v7 research-driven** (backtest validated):
 - MACD death cross exit REMOVED (premature exits hurt avg win)
 - MACD/RSI entry confirmation REMOVED (over-filtered VWAP bounces)
 - Midday/trend filters REMOVED for VWAP (needs volume from all sessions)
 - VWAP touch exit is primary TP signal (proven best for mean reversion)
 - Trailing stop provides downside protection
+- ATR-based dynamic stop-loss adapts to per-symbol volatility (v7)
 - Volume surge detection kept for entry quality
 """
 
@@ -59,6 +60,8 @@ class VWAPScalpStrategy(BaseStrategy):
         self._symbol_filters: dict[str, dict] = {}
         # Track MACD/RSI signal windows (from Alpaca example)
         self._signal_window: dict[str, dict] = {}  # symbol -> signal state
+        # ATR-based dynamic stop-loss per position (v7)
+        self._atr_stops: dict[str, Decimal] = {}  # symbol -> dynamic SL %
 
     @property
     def name(self) -> str:
@@ -175,8 +178,9 @@ class VWAPScalpStrategy(BaseStrategy):
                     )
                 return orders
 
-            # Stop loss
-            if pos.unrealized_pnl_percent <= -sl:
+            # Stop loss (ATR-based dynamic: uses per-position stop %)
+            dynamic_sl = self._atr_stops.get(symbol, sl)
+            if pos.unrealized_pnl_percent <= -dynamic_sl:
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
@@ -202,11 +206,26 @@ class VWAPScalpStrategy(BaseStrategy):
             if not await self.passes_confluence_gate(symbol):
                 return orders
 
+            # ── ATR-based dynamic stop-loss (v7: never tighter than baseline) ──
+            dynamic_sl_pct = float(self.settings.VWAP_STOP_LOSS_PERCENT)
+            if len(df) >= 15:
+                tr = pd.concat([
+                    df['high'] - df['low'],
+                    (df['high'] - df['close'].shift(1)).abs(),
+                    (df['low'] - df['close'].shift(1)).abs()
+                ], axis=1).max(axis=1)
+                atr_14 = tr.rolling(14).mean().iloc[-1]
+                if not pd.isna(atr_14):
+                    atr_pct = (atr_14 / float(current_price)) * 100
+                    baseline_sl = float(self.settings.VWAP_STOP_LOSS_PERCENT)
+                    dynamic_sl_pct = max(baseline_sl, min(0.50, atr_pct * 1.5))
+            self._atr_stops[symbol] = Decimal(str(round(dynamic_sl_pct, 4)))
+
             # ── Dynamic position sizing (v5: Kelly + 2% risk + progressive) ──
             quantity = await self.compute_dynamic_quantity(
                 symbol, current_price,
                 fallback_usd=self.settings.VWAP_ORDER_SIZE_USD,
-                stop_loss_pct=self.settings.VWAP_STOP_LOSS_PERCENT,
+                stop_loss_pct=dynamic_sl_pct,
             )
 
             quantity = round_quantity(quantity, filters["step_size"])
@@ -260,6 +279,7 @@ class VWAPScalpStrategy(BaseStrategy):
                         self.record_loss()
             if pos and pos.is_closed:
                 self._reset_trailing_high(symbol)
+                self._atr_stops.pop(symbol, None)  # Clean up ATR stop (v7)
 
         self.active_orders = [
             o for o in self.active_orders if o.internal_id != order.internal_id

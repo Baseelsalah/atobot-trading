@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     DATA_FEED: str = "iex"  # "iex" (free) or "sip" (paid SIP consolidated)
 
     # ── Trading ───────────────────────────────────────────────────────────────
-    SYMBOLS: list[str] = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD"]
+    SYMBOLS: list[str] = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD",
+                          "META", "GOOGL", "AMZN", "AVGO", "NFLX",
+                          "SPY", "QQQ", "CRM", "UBER", "MU"]
     DEFAULT_STRATEGY: str = "vwap_scalp"  # VWAP is strongest strategy per backtest
     STRATEGIES: list[str] = []  # Run multiple: ["vwap_scalp", "ema_pullback", "momentum"]
     BASE_ORDER_SIZE_USD: float = 500.0  # Base dollar amount per trade

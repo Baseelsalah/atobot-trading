@@ -46,7 +46,9 @@ ALPACA_KEY = os.getenv("ALPACA_API_KEY", "")
 ALPACA_SECRET = os.getenv("ALPACA_API_SECRET", "")
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SYMBOLS = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD"]
+SYMBOLS = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD",
+          "META", "GOOGL", "AMZN", "AVGO", "NFLX",
+          "SPY", "QQQ", "CRM", "UBER", "MU"]
 STARTING_CAPITAL = 100_000.0
 ORDER_SIZE_USD = 17_000.0          # Fixed size for baseline / improved
 MAX_ORDER_FRACTION = 0.10          # 10% cap per trade (for Kelly)
@@ -421,6 +423,20 @@ def _compute_win_probability(closes: list[float], volumes: list[float]) -> float
 
     prob = max(0.0, min(1.0, (score / total + 1) / 2))
     return round(prob, 4)
+
+
+def _compute_atr(highs: list[float], lows: list[float],
+                 closes: list[float], period: int = 14) -> float:
+    """Compute ATR from price lists. Returns 0.0 if insufficient data."""
+    if len(highs) < period + 1:
+        return 0.0
+    true_ranges: list[float] = []
+    for i in range(-period, 0):
+        h, l = highs[i], lows[i]
+        prev_c = closes[i - 1]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        true_ranges.append(tr)
+    return sum(true_ranges) / len(true_ranges)
 
 
 def _kelly_size(win_rate: float, avg_win: float, avg_loss: float,
@@ -1096,8 +1112,8 @@ def run_vwap_ultra(bars_5m: dict[str, list[dict]]) -> Result:
                         res.update_drawdown()
                         continue
 
-                    # Stop loss
-                    if pnl_pct <= -sl_pct:
+                    # Stop loss (ATR-based: per-position dynamic stop price)
+                    if price <= pos.stop_loss:
                         pnl = (price - pos.entry_price) * pos.quantity
                         res.closed_pnl.append(pnl)
                         res.cash += price * pos.quantity
@@ -1142,7 +1158,16 @@ def run_vwap_ultra(bars_5m: dict[str, list[dict]]) -> Result:
                         wr = strategy_wins / max(total_trades, 1)
                         aw = strategy_total_win / max(strategy_wins, 1)
                         al = strategy_total_loss / max(strategy_losses, 1)
-                        order_usd = _kelly_size(wr, aw, al, res.cash, price, sl_pct)
+
+                        # ATR-based dynamic stop-loss (v7: never tighter than baseline)
+                        atr_val = _compute_atr(highs, lows, closes)
+                        if atr_val > 0:
+                            atr_pct_local = (atr_val / price) * 100
+                            dyn_sl = max(sl_pct, min(0.50, atr_pct_local * 1.5))
+                        else:
+                            dyn_sl = sl_pct  # Fallback to fixed
+
+                        order_usd = _kelly_size(wr, aw, al, res.cash, price, dyn_sl)
                         order_usd = max(order_usd, ORDER_SIZE_USD)  # Never smaller than baseline
 
                         # Progressive risk scaling (v5: reduce after losses)
@@ -1156,7 +1181,7 @@ def run_vwap_ultra(bars_5m: dict[str, list[dict]]) -> Result:
 
                         if res.cash >= cost:
                             res.cash -= cost
-                            sl_price = price * (1 - sl_pct / 100)
+                            sl_price = price * (1 - dyn_sl / 100)
                             res.open_positions[sym] = Position(
                                 sym, price, qty, ts, strategy="vwap", stop_loss=sl_price
                             )
@@ -2323,6 +2348,12 @@ def main() -> None:
                         help="Backtest period: 1m (1 month), 3m (3 months), both")
     parser.add_argument("--output", type=str, default=None,
                         help="Save output to file")
+    parser.add_argument("--start", type=str, default=None,
+                        help="Custom start date (YYYY-MM-DD)")
+    parser.add_argument("--end", type=str, default=None,
+                        help="Custom end date (YYYY-MM-DD)")
+    parser.add_argument("--label", type=str, default=None,
+                        help="Custom label for the backtest period")
     args = parser.parse_args()
 
     end = datetime(2026, 2, 21, tzinfo=timezone.utc)
@@ -2334,13 +2365,20 @@ def main() -> None:
         sys.stdout = output
 
     try:
-        if args.period in ("1m", "both"):
-            start_1m = end - timedelta(days=30)
-            run_backtest(start_1m, end, "1 MONTH")
+        # Custom date range mode
+        if args.start and args.end:
+            custom_start = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            custom_end = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            label = args.label or f"{args.start} to {args.end}"
+            run_backtest(custom_start, custom_end, label)
+        else:
+            if args.period in ("1m", "both"):
+                start_1m = end - timedelta(days=30)
+                run_backtest(start_1m, end, "1 MONTH")
 
-        if args.period in ("3m", "both"):
-            start_3m = end - timedelta(days=90)
-            run_backtest(start_3m, end, "3 MONTHS")
+            if args.period in ("3m", "both"):
+                start_3m = end - timedelta(days=90)
+                run_backtest(start_3m, end, "3 MONTHS")
 
     finally:
         if args.output:
