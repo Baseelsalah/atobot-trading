@@ -121,6 +121,35 @@ class MomentumStrategy(BaseStrategy):
                     )
                 return orders
 
+            # MACD death cross early exit (matches VWAP/ORB behavior)
+            if getattr(self.settings, "MACD_CONFIRMATION_ENABLED", True):
+                try:
+                    ohlcv_exit = await self.exchange.get_klines(symbol, "5m", 40)
+                    if ohlcv_exit and len(ohlcv_exit) >= 35:
+                        import pandas as pd
+                        df_exit = pd.DataFrame(ohlcv_exit)
+                        for col in ("open", "high", "low", "close", "volume"):
+                            df_exit[col] = df_exit[col].astype(float)
+                        macd_exit = indicators.macd_signal(df_exit)
+                        if macd_exit.get("death_cross"):
+                            sell_qty = round_quantity(pos.quantity, filters["step_size"])
+                            if sell_qty > Decimal("0"):
+                                orders.append(Order(
+                                    symbol=symbol,
+                                    side=OrderSide.SELL,
+                                    order_type=OrderType.MARKET,
+                                    price=current_price,
+                                    quantity=sell_qty,
+                                    strategy=self.name,
+                                ))
+                                logger.info(
+                                    "[Momentum] MACD death cross exit {} | PnL%={:.2f}",
+                                    symbol, pos.unrealized_pnl_percent,
+                                )
+                            return orders
+                except Exception:
+                    pass  # Don't block on data errors
+
             # Already in position, no new entry
             return orders
 
@@ -155,7 +184,7 @@ class MomentumStrategy(BaseStrategy):
             avg_vol = vol_sma.iloc[-1]
             vol_ok = current_vol >= avg_vol * self.settings.MOMENTUM_VOLUME_MULTIPLIER
 
-            # Entry signal: RSI oversold + volume confirmation
+            # Entry signal: RSI oversold + volume confirmation + MACD
             rsi_buy = current_rsi <= self.settings.MOMENTUM_RSI_OVERSOLD
             # Also check RSI momentum (crossing back up from oversold)
             if len(rsi_series) >= 2:
@@ -164,9 +193,31 @@ class MomentumStrategy(BaseStrategy):
             else:
                 rsi_crossover = False
 
-            if (rsi_buy or rsi_crossover) and vol_ok:
-                order_usd = Decimal(str(self.settings.BASE_ORDER_SIZE_USD))
-                quantity = order_usd / current_price
+            # MACD confirmation (v2 improvement)
+            macd_ok = True
+            if getattr(self.settings, "MACD_CONFIRMATION_ENABLED", True) and len(df) >= 35:
+                try:
+                    macd_info = indicators.macd_signal(df)
+                    macd_ok = macd_info["bullish"] or macd_info["golden_cross"]
+                    if not macd_ok:
+                        logger.info(
+                            "[Momentum] BLOCKED {} | RSI={:.1f} but MACD bearish (MACD={:.4f})",
+                            symbol, current_rsi, macd_info["macd"],
+                        )
+                except Exception:
+                    pass  # On error, don't block
+
+            if (rsi_buy or rsi_crossover) and vol_ok and macd_ok:
+                # Confluence gate (v5: multi-indicator quality filter)
+                if not await self.passes_confluence_gate(symbol):
+                    return orders
+
+                # Dynamic position sizing (v5: Kelly + 2% risk + progressive)
+                quantity = await self.compute_dynamic_quantity(
+                    symbol, current_price,
+                    fallback_usd=self.settings.BASE_ORDER_SIZE_USD,
+                    stop_loss_pct=self.settings.MOMENTUM_STOP_LOSS_PERCENT,
+                )
                 quantity = round_quantity(quantity, filters["step_size"])
 
                 if quantity > Decimal("0"):
@@ -205,7 +256,14 @@ class MomentumStrategy(BaseStrategy):
         elif order.side == OrderSide.SELL:
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
+                # Track win/loss for progressive risk scaling (v5)
+                pnl = pos.unrealized_pnl
                 pos.reduce_position(order.filled_quantity, order.price)
+                if pos.is_closed:
+                    if pnl > Decimal("0"):
+                        self.record_win()
+                    else:
+                        self.record_loss()
             if pos and pos.is_closed:
                 self._reset_trailing_high(symbol)
 

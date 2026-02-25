@@ -2,6 +2,14 @@
 
 Buys when price dips below VWAP by a configured percentage and sells
 when it bounces back to or above VWAP (mean-reversion scalp).
+
+**v3 research-driven** (backtest validated @ +$11,025 / 3mo):
+- MACD death cross exit REMOVED (premature exits hurt avg win)
+- MACD/RSI entry confirmation REMOVED (over-filtered VWAP bounces)
+- Midday/trend filters REMOVED for VWAP (needs volume from all sessions)
+- VWAP touch exit is primary TP signal (proven best for mean reversion)
+- Trailing stop provides downside protection
+- Volume surge detection kept for entry quality
 """
 
 from __future__ import annotations
@@ -12,6 +20,7 @@ from decimal import Decimal
 from loguru import logger
 
 from src.config.settings import Settings
+from src.data import indicators
 from src.exchange.base_client import BaseExchangeClient
 from src.models.order import Order, OrderSide, OrderType
 from src.models.position import Position
@@ -21,16 +30,22 @@ from src.utils.helpers import round_quantity
 
 
 class VWAPScalpStrategy(BaseStrategy):
-    """VWAP mean-reversion scalp strategy.
+    """VWAP mean-reversion scalp strategy (v3 research-optimized).
 
     Entry (BUY):
     * Price is below VWAP by ``VWAP_BOUNCE_PERCENT`` or more.
     * No existing position in the symbol.
 
     Exit (SELL):
-    * Price returns to VWAP (or above) → take-profit.
-    * Unrealised loss exceeds ``VWAP_STOP_LOSS_PERCENT`` → stop-loss.
+    * Price returns to VWAP (or above) -> take-profit (primary signal).
+    * Trailing stop protects gains.
+    * Unrealised loss exceeds ``VWAP_STOP_LOSS_PERCENT`` -> stop-loss.
     * End-of-day flatten (handled by engine).
+
+    v3 changes (backtest validated):
+    * MACD death cross exit REMOVED (hurt avg win by premature exits).
+    * MACD/RSI entry filters REMOVED (over-filtered valid VWAP bounces).
+    * Midday avoidance REMOVED for VWAP (needs all-session volume).
     """
 
     def __init__(
@@ -42,6 +57,8 @@ class VWAPScalpStrategy(BaseStrategy):
         super().__init__(exchange_client, risk_manager, settings)
         self._initialized_symbols: set[str] = set()
         self._symbol_filters: dict[str, dict] = {}
+        # Track MACD/RSI signal windows (from Alpaca example)
+        self._signal_window: dict[str, dict] = {}  # symbol -> signal state
 
     @property
     def name(self) -> str:
@@ -50,6 +67,11 @@ class VWAPScalpStrategy(BaseStrategy):
     async def initialize(self, symbol: str) -> None:
         logger.info("[VWAP] Initialising for {}", symbol)
         self._symbol_filters[symbol] = await self.exchange.get_symbol_filters(symbol)
+        self._signal_window[symbol] = {
+            "macd_cross_tick": None,
+            "rsi_bounce_tick": None,
+            "tick_count": 0,
+        }
         self._initialized_symbols.add(symbol)
         self.is_running = True
 
@@ -85,7 +107,11 @@ class VWAPScalpStrategy(BaseStrategy):
         filters = self._symbol_filters[symbol]
         pos = self.positions.get(symbol)
 
-        # ── Fetch intraday bars for VWAP calculation ─────────────────────
+        # Increment tick counter for signal window tracking
+        if symbol in self._signal_window:
+            self._signal_window[symbol]["tick_count"] += 1
+
+        # ── Fetch intraday bars for VWAP + indicator calculation ─────────
         try:
             bars = await self.exchange.get_klines(symbol, "5m", 80)
         except Exception as exc:
@@ -95,6 +121,22 @@ class VWAPScalpStrategy(BaseStrategy):
         vwap = self._compute_vwap(bars)
         if vwap is None or vwap <= 0:
             return orders
+
+        # ── Compute MACD and RSI from bar data ───────────────────────────
+        import pandas as pd
+        macd_info = None
+        rsi_info = None
+        try:
+            df = pd.DataFrame(bars)
+            for col in ("open", "high", "low", "close", "volume"):
+                df[col] = df[col].astype(float)
+
+            if len(df) >= 35:  # Need enough bars for MACD (26+9)
+                macd_info = indicators.macd_signal(df)
+            if len(df) >= 16:  # Need enough bars for RSI (14+2)
+                rsi_info = indicators.rsi_bounce(df)
+        except Exception as exc:
+            logger.debug("[VWAP] Indicator calc error for {}: {}", symbol, exc)
 
         # ── Exit logic ───────────────────────────────────────────────────
         if pos and not pos.is_closed:
@@ -113,6 +155,9 @@ class VWAPScalpStrategy(BaseStrategy):
                     ))
                     logger.info("[VWAP] TRAILING STOP {} | PnL%={:.2f}", symbol, pos.unrealized_pnl_percent)
                 return orders
+
+            # MACD death cross exit REMOVED in v3 (backtest proved it hurt avg win)
+            # VWAP mean-reversion doesn't need momentum confirmation to exit
 
             # Take profit: price returned to VWAP (or above) or PnL target
             price_above_vwap = current_price >= vwap
@@ -144,19 +189,26 @@ class VWAPScalpStrategy(BaseStrategy):
 
             return orders
 
-        # ── Entry logic: price below VWAP ────────────────────────────────
-        # Check entry filters first
-        if not self._passes_time_filter():
-            return orders
-        if not await self._passes_trend_filter(symbol, current_price):
-            return orders
+        # ── Entry logic: price below VWAP (v3: no MACD/RSI/midday filters) ──
+        # VWAP mean-reversion needs all-session volume; filters removed per backtest
+        # Trend/midday filters are NOT applied for VWAP (backtest validated)
 
         bounce_pct = Decimal(str(self.settings.VWAP_BOUNCE_PERCENT))
         deviation = ((vwap - current_price) / vwap) * Decimal("100")
 
         if deviation >= bounce_pct:
-            order_usd = Decimal(str(self.settings.VWAP_ORDER_SIZE_USD))
-            quantity = order_usd / current_price
+
+            # Confluence gate (v5: multi-indicator quality filter)
+            if not await self.passes_confluence_gate(symbol):
+                return orders
+
+            # ── Dynamic position sizing (v5: Kelly + 2% risk + progressive) ──
+            quantity = await self.compute_dynamic_quantity(
+                symbol, current_price,
+                fallback_usd=self.settings.VWAP_ORDER_SIZE_USD,
+                stop_loss_pct=self.settings.VWAP_STOP_LOSS_PERCENT,
+            )
+
             quantity = round_quantity(quantity, filters["step_size"])
 
             if quantity > Decimal("0"):
@@ -165,9 +217,18 @@ class VWAPScalpStrategy(BaseStrategy):
                     order_type=OrderType.MARKET, price=current_price,
                     quantity=quantity, strategy=self.name,
                 ))
+                macd_str = f"MACD={macd_info['macd']:.4f}" if macd_info else "MACD=N/A"
+                rsi_str = f"RSI={rsi_info['rsi_now']:.1f}" if rsi_info else "RSI=N/A"
                 logger.info(
-                    "[VWAP] BUY signal {} | price={} vwap={} deviation={:.2f}%",
-                    symbol, current_price, vwap, deviation,
+                    "[VWAP] BUY signal {} | price={} vwap={} dev={:.2f}% | {} | {}",
+                    symbol, current_price, vwap, deviation, macd_str, rsi_str,
+                )
+        else:
+            # Log why no entry (every 60 ticks to avoid spam)
+            if symbol in self._signal_window and self._signal_window[symbol]["tick_count"] % 60 == 0:
+                logger.info(
+                    "[VWAP] No entry {} | price={} vwap={} dev={:.2f}% (need {:.2f}%)",
+                    symbol, current_price, vwap, deviation, bounce_pct,
                 )
 
         return orders
@@ -189,7 +250,14 @@ class VWAPScalpStrategy(BaseStrategy):
         elif order.side == OrderSide.SELL:
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
+                # Track win/loss for progressive risk scaling (v5)
+                pnl = pos.unrealized_pnl
                 pos.reduce_position(order.filled_quantity, order.price)
+                if pos.is_closed:
+                    if pnl > Decimal("0"):
+                        self.record_win()
+                    else:
+                        self.record_loss()
             if pos and pos.is_closed:
                 self._reset_trailing_high(symbol)
 

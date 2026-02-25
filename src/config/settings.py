@@ -151,13 +151,24 @@ class Settings(BaseSettings):
     BRACKET_TRAILING_DISTANCE: float = 0.5  # Trailing stop distance %
 
     # ── Ultra Bot: Position Sizing (Kelly) ────────────────────────────────────
-    KELLY_SIZING_ENABLED: bool = False      # Use Kelly criterion sizing
+    KELLY_SIZING_ENABLED: bool = True       # Use Kelly criterion sizing (v5: enabled)
     KELLY_FRACTION: float = 0.5             # Half-Kelly (conservative)
     MAX_RISK_PER_TRADE: float = 0.02        # 2% of account per trade
     MAX_PORTFOLIO_HEAT: float = 0.06        # 6% total portfolio risk
     MAX_POSITION_PCT: float = 0.10          # 10% max single position
     MAX_SECTOR_CONCENTRATION: float = 0.25  # 25% max in one sector
     MIN_KELLY_TRADES: int = 20              # Min trades for Kelly
+
+    # ── Ultra Bot: Confluence Gate ────────────────────────────────────────────
+    CONFLUENCE_GATE_ENABLED: bool = True    # Require min confluence score to enter
+    CONFLUENCE_MIN_SCORE: int = 30          # Min 0-100 score (30 = filter weakest)
+    CONFLUENCE_BARS_NEEDED: int = 60        # Bars needed for confluence calc
+
+    # ── Ultra Bot: Progressive Risk Scaling ───────────────────────────────────
+    PROGRESSIVE_RISK_ENABLED: bool = True   # Reduce size after consecutive losses
+    PROGRESSIVE_LOSS_MULTIPLIER: float = 0.75  # Size multiplier per consec loss
+    PROGRESSIVE_MIN_MULTIPLIER: float = 0.25   # Floor (never below 25% size)
+    PROGRESSIVE_MAX_LOSSES: int = 5         # Max consec losses before cooldown
 
     # ── Ultra Bot: Strategy Selector ──────────────────────────────────────────
     STRATEGY_SELECTOR_ENABLED: bool = True  # Regime-aware strategy rotation

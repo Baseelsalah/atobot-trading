@@ -1,0 +1,23 @@
+﻿
+################################################################################
+  AtoBot ULTRA Backtester -- 3 MONTHS
+################################################################################
+
+  Symbols:   AAPL, MSFT, TSLA, NVDA, AMD
+  Capital:   $100,000
+  Period:    2025-11-23 to 2026-02-21
+
+  Ultra Features:
+    Confluence gate:     >= 40
+    ML win-prob gate:    >= 40%
+    Kelly sizing:        50% Kelly
+    Bracket TP1/TP2:     1.5% / 3.0%
+    MACD death cross:    ON
+    Portfolio heat cap:  6%
+    Max consec losses:   5 -> 60 bar cooldown
+
+  Fetching historical data...
+    Fetching AAPL... 42,272 bars
+    Fetching MSFT... 46,398 bars
+    Fetching TSLA... 55,961 bars
+    Fetching NVDA... 56,390 bars

@@ -110,6 +110,14 @@ def mock_exchange_client() -> AsyncMock:
             {"filterType": "MIN_NOTIONAL", "minNotional": "1"},
         ],
     }
+
+    # Streaming defaults (not halted, no queued events)
+    client.is_symbol_halted.return_value = False
+    client.is_streaming.return_value = False
+    client.is_trade_streaming.return_value = False
+    client.drain_trade_updates.return_value = []
+    client.drain_news_events.return_value = []
+
     return client
 
 

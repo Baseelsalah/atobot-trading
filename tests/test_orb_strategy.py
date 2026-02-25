@@ -83,7 +83,21 @@ class TestORBBreakout:
         strategy._range_high["AAPL"] = Decimal("186.00")
         strategy._range_low["AAPL"] = Decimal("183.00")
 
-        # Price above breakout level: 186 * (1 + 0.001) ≈ 186.186
+        # Volume-confirmed breakout: last bar needs 1.3x+ avg volume
+        high_vol_bars = [
+            {
+                "timestamp": 1700000000000 + i * 300000,
+                "open": Decimal("185") + Decimal(str(i)),
+                "high": Decimal("186") + Decimal(str(i)),
+                "low": Decimal("184") + Decimal(str(i)),
+                "close": Decimal("185.50") + Decimal(str(i)),
+                "volume": Decimal("50000") if i < 39 else Decimal("80000"),
+            }
+            for i in range(40)
+        ]
+        strategy.exchange.get_klines = AsyncMock(return_value=high_vol_bars)
+
+        # Price above breakout level: 186 * (1 + 0.001) = 186.186
         orders = await strategy.on_tick("AAPL", Decimal("187.00"))
         assert len(orders) == 1
         assert orders[0].side == "BUY"

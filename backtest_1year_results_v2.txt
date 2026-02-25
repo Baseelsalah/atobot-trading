@@ -1,0 +1,423 @@
+﻿
+======================================================================
+  AtoBot 1-YEAR BACKTEST v2 -- Scaling to $70-80K/yr
+======================================================================
+
+  Period:         2025-02-22 to 2026-02-22 (1 year)
+  Starting Cap:   $100,000
+  Buying Power:   $200,000 (2:1 margin)
+  Strategy:       VWAP Scalp + ORB baseline (midday filter)
+  Symbols (5):    AAPL, MSFT, TSLA, NVDA, AMD
+  Symbols (8):    AAPL, MSFT, TSLA, NVDA, AMD, META, AMZN, GOOG
+  Order sizes:    $17K, $25K, $30K, $35K
+  Slippage:       1.0 bps per round-trip trade
+  Risk limits:    $2,000/day loss limit, 8.0% max DD
+
+  Fetching 1-year of minute data for 8 symbols...
+  (This may take a few minutes...)
+
+Fetching historical data from Alpaca...
+  AAPL... 187,921 bars
+  MSFT... 162,522 bars
+  TSLA... 234,747 bars
+  NVDA... 237,966 bars
+  AMD... 206,265 bars
+  META... 163,616 bars
+  AMZN... 193,748 bars
+  GOOG... 171,702 bars
+
+  Total bars: 1,558,487 | Trading days: 270
+
+
+======================================================================
+  TEST 1: 5 SYMBOLS -- Order Size Scaling
+======================================================================
+
+  Running VWAP+ORB 5sym $17K...
+
+  Running VWAP+ORB 5sym $25K...
+
+  Running VWAP+ORB 5sym $30K...
+
+  Running VWAP+ORB 5sym $35K...
+
+======================================================================
+  VWAP+ORB 5sym $17K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    126,940.62
+  Net P&L (raw):        $     26,940.62  (+26.94%)
+  Est. Slippage:        $     21,086.80
+  Net P&L (adj):        $      5,853.82
+  Max Drawdown:                  12.58%
+  Sharpe (approx):                0.31
+
+  Total Trades:            12404
+  Wins / Losses:         6159 / 6245 
+  Win Rate:                       49.7%
+  Avg Win:              $         81.66
+  Avg Loss:             $        -76.23
+  Profit Factor:                  1.06
+
+  Exit Reasons:  TP=5820  SL=5998  EOD=586
+  Symbols Traded:       5 (AAPL, AMD, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $         99.78
+  Monthly P&L (raw):    $      2,095.38
+  Monthly P&L (adj):    $        455.30
+  Annual P&L (adj):     $      5,463.56
+  Trading Days:              270
+  Halted Days:                11
+======================================================================
+
+======================================================================
+  VWAP+ORB 5sym $25K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    141,073.93
+  Net P&L (raw):        $     41,073.93  (+41.07%)
+  Est. Slippage:        $     28,877.50
+  Net P&L (adj):        $     12,196.43
+  Max Drawdown:                  15.65%
+  Sharpe (approx):                0.35
+
+  Total Trades:            11551
+  Wins / Losses:         5797 / 5754 
+  Win Rate:                       50.2%
+  Avg Win:              $        117.81
+  Avg Loss:             $       -111.55
+  Profit Factor:                  1.06
+
+  Exit Reasons:  TP=5480  SL=5513  EOD=558
+  Symbols Traded:       5 (AAPL, AMD, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        152.13
+  Monthly P&L (raw):    $      3,194.64
+  Monthly P&L (adj):    $        948.61
+  Annual P&L (adj):     $     11,383.34
+  Trading Days:              270
+  Halted Days:                23
+======================================================================
+
+======================================================================
+  VWAP+ORB 5sym $30K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    157,347.29
+  Net P&L (raw):        $     57,347.29  (+57.35%)
+  Est. Slippage:        $     32,019.00
+  Net P&L (adj):        $     25,328.29
+  Max Drawdown:                  16.09%
+  Sharpe (approx):                0.42
+
+  Total Trades:            10673
+  Wins / Losses:         5432 / 5241 
+  Win Rate:                       50.9%
+  Avg Win:              $        139.65
+  Avg Loss:             $       -133.80
+  Profit Factor:                  1.08
+
+  Exit Reasons:  TP=5130  SL=5012  EOD=531
+  Symbols Traded:       5 (AAPL, AMD, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        212.40
+  Monthly P&L (raw):    $      4,460.34
+  Monthly P&L (adj):    $      1,969.98
+  Annual P&L (adj):     $     23,639.73
+  Trading Days:              270
+  Halted Days:                30
+======================================================================
+
+======================================================================
+  VWAP+ORB 5sym $35K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    181,172.43
+  Net P&L (raw):        $     81,172.43  (+81.17%)
+  Est. Slippage:        $     35,735.00
+  Net P&L (adj):        $     45,437.43
+  Max Drawdown:                  11.92%
+  Sharpe (approx):                0.55
+
+  Total Trades:            10210
+  Wins / Losses:         5247 / 4963 
+  Win Rate:                       51.4%
+  Avg Win:              $        162.11
+  Avg Loss:             $       -155.03
+  Profit Factor:                  1.11
+
+  Exit Reasons:  TP=4954  SL=4743  EOD=513
+  Symbols Traded:       5 (AAPL, AMD, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        300.64
+  Monthly P&L (raw):    $      6,313.41
+  Monthly P&L (adj):    $      3,534.02
+  Annual P&L (adj):     $     42,408.27
+  Trading Days:              270
+  Halted Days:                35
+======================================================================
+
+
+======================================================================
+  TEST 2: 8 SYMBOLS -- Order Size Scaling
+======================================================================
+
+  Running VWAP+ORB 8sym $17K...
+
+  Running VWAP+ORB 8sym $25K...
+
+  Running VWAP+ORB 8sym $30K...
+
+  Running VWAP+ORB 8sym $35K...
+
+======================================================================
+  VWAP+ORB 8sym $17K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    135,459.15
+  Net P&L (raw):        $     35,459.15  (+35.46%)
+  Est. Slippage:        $     29,438.90
+  Net P&L (adj):        $      6,020.25
+  Max Drawdown:                  16.98%
+  Sharpe (approx):                0.31
+
+  Total Trades:            17317
+  Wins / Losses:         8782 / 8535 
+  Win Rate:                       50.7%
+  Avg Win:              $         76.80
+  Avg Loss:             $        -74.86
+  Profit Factor:                  1.06
+
+  Exit Reasons:  TP=8269  SL=8171  EOD=877
+  Symbols Traded:       8 (AAPL, AMD, AMZN, GOOG, META, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        131.33
+  Monthly P&L (raw):    $      2,757.93
+  Monthly P&L (adj):    $        468.24
+  Annual P&L (adj):     $      5,618.90
+  Trading Days:              270
+  Halted Days:                25
+======================================================================
+
+======================================================================
+  VWAP+ORB 8sym $25K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    181,186.31
+  Net P&L (raw):        $     81,186.31  (+81.19%)
+  Est. Slippage:        $     38,132.50
+  Net P&L (adj):        $     43,053.81
+  Max Drawdown:                  10.65%
+  Sharpe (approx):                0.55
+
+  Total Trades:            15253
+  Wins / Losses:         7925 / 7328 
+  Win Rate:                       52.0%
+  Avg Win:              $        111.03
+  Avg Loss:             $       -109.00
+  Profit Factor:                  1.10
+
+  Exit Reasons:  TP=7450  SL=7019  EOD=784
+  Symbols Traded:       8 (AAPL, AMD, AMZN, GOOG, META, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        300.69
+  Monthly P&L (raw):    $      6,314.49
+  Monthly P&L (adj):    $      3,348.63
+  Annual P&L (adj):     $     40,183.56
+  Trading Days:              270
+  Halted Days:                34
+======================================================================
+
+======================================================================
+  VWAP+ORB 8sym $30K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    192,376.74
+  Net P&L (raw):        $     92,376.74  (+92.38%)
+  Est. Slippage:        $     42,747.00
+  Net P&L (adj):        $     49,629.74
+  Max Drawdown:                  11.76%
+  Sharpe (approx):                0.54
+
+  Total Trades:            14249
+  Wins / Losses:         7479 / 6770 
+  Win Rate:                       52.5%
+  Avg Win:              $        131.71
+  Avg Loss:             $       -131.86
+  Profit Factor:                  1.10
+
+  Exit Reasons:  TP=7008  SL=6476  EOD=765
+  Symbols Traded:       8 (AAPL, AMD, AMZN, GOOG, META, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        342.14
+  Monthly P&L (raw):    $      7,184.86
+  Monthly P&L (adj):    $      3,860.09
+  Annual P&L (adj):     $     46,321.09
+  Trading Days:              270
+  Halted Days:                41
+======================================================================
+
+======================================================================
+  VWAP+ORB 8sym $35K
+======================================================================
+  Starting Capital:     $    100,000.00
+  Final Equity:         $    236,312.69
+  Net P&L (raw):        $    136,312.69  (+136.31%)
+  Est. Slippage:        $     46,812.50
+  Net P&L (adj):        $     89,500.19
+  Max Drawdown:                  11.15%
+  Sharpe (approx):                0.74
+
+  Total Trades:            13375
+  Wins / Losses:         7095 / 6280 
+  Win Rate:                       53.0%
+  Avg Win:              $        153.42
+  Avg Loss:             $       -151.63
+  Profit Factor:                  1.14
+
+  Exit Reasons:  TP=6664  SL=5988  EOD=723
+  Symbols Traded:       8 (AAPL, AMD, AMZN, GOOG, META, MSFT, NVDA, TSLA)
+
+  Avg Daily P&L (raw):  $        504.86
+  Monthly P&L (raw):    $     10,602.10
+  Monthly P&L (adj):    $      6,961.13
+  Annual P&L (adj):     $     83,533.51
+  Trading Days:              270
+  Halted Days:                43
+======================================================================
+
+
+======================================================================
+  MONTHLY P&L BREAKDOWN
+======================================================================
+
+  MONTHLY BREAKDOWN: VWAP+ORB 8sym $25K
+  Month               P&L   Trades        Cum P&L  Win Mo?
+  ---------- ------------ -------- -------------- --------
+  2025-02    $  -1,644.61      345 $    -1,644.61       no
+  2025-03    $    -467.53     1354 $    -2,112.14       no
+  2025-04    $    +186.73     1581 $    -1,925.40      YES
+  2025-05    $ +22,240.09     1260 $   +20,314.68      YES
+  2025-06    $  +8,607.02     1156 $   +28,921.71      YES
+  2025-07    $  +6,956.90     1171 $   +35,878.61      YES
+  2025-08    $    +964.15     1173 $   +36,842.76      YES
+  2025-09    $  +6,028.27     1190 $   +42,871.03      YES
+  2025-10    $ +28,442.04     1530 $   +71,313.07      YES
+  2025-11    $  -6,552.05     1126 $   +64,761.02       no
+  2025-12    $  +6,982.08     1185 $   +71,743.10      YES
+  2026-01    $  +9,352.15     1235 $   +81,095.25      YES
+  2026-02    $     +91.07      947 $   +81,186.31      YES
+  ---------- ------------ -------- -------------- --------
+  Winning Months: 10/13 (77%)
+
+
+  MONTHLY BREAKDOWN: VWAP+ORB 8sym $35K
+  Month               P&L   Trades        Cum P&L  Win Mo?
+  ---------- ------------ -------- -------------- --------
+  2025-02    $  -1,181.60      245 $    -1,181.60       no
+  2025-03    $  +7,192.67      930 $    +6,011.07      YES
+  2025-04    $  +2,957.24     1231 $    +8,968.32      YES
+  2025-05    $ +25,503.44     1070 $   +34,471.75      YES
+  2025-06    $ +15,484.96     1029 $   +49,956.71      YES
+  2025-07    $ +11,354.10     1090 $   +61,310.81      YES
+  2025-08    $  +3,426.68      995 $   +64,737.49      YES
+  2025-09    $ +10,037.24     1113 $   +74,774.73      YES
+  2025-10    $ +37,824.19     1484 $  +112,598.93      YES
+  2025-11    $  -1,719.17     1064 $  +110,879.76       no
+  2025-12    $  +9,185.06     1160 $  +120,064.82      YES
+  2026-01    $ +15,536.36     1145 $  +135,601.18      YES
+  2026-02    $    +711.50      819 $  +136,312.69      YES
+  ---------- ------------ -------- -------------- --------
+  Winning Months: 11/13 (85%)
+
+
+
+======================================================================
+  COMPOUNDING SIMULATION (reinvest profits monthly)
+======================================================================
+
+  Base: VWAP+ORB 8sym $25K, compound monthly
+  Month         Raw P&L  Scale    Adj P&L         Equity     Order$
+  ---------- ---------- ------ ---------- -------------- ----------
+  2025-02    $   -1,645  1.00x $   -1,645 $       98,355 $   25,000
+  2025-03    $     -468  0.98x $     -460 $       97,896 $   24,589
+  2025-04    $     +187  0.98x $     +183 $       98,078 $   24,474
+  2025-05    $  +22,240  0.98x $  +21,813 $      119,891 $   24,520
+  2025-06    $   +8,607  1.20x $  +10,319 $      130,210 $   29,973
+  2025-07    $   +6,957  1.30x $   +9,059 $      139,269 $   32,553
+  2025-08    $     +964  1.39x $   +1,343 $      140,611 $   34,817
+  2025-09    $   +6,028  1.41x $   +8,476 $      149,088 $   35,153
+  2025-10    $  +28,442  1.49x $  +42,404 $      191,492 $   37,272
+  2025-11    $   -6,552  1.91x $  -12,547 $      178,945 $   47,873
+  2025-12    $   +6,982  1.79x $  +12,494 $      191,439 $   44,736
+  2026-01    $   +9,352  1.91x $  +17,904 $      209,343 $   47,860
+  2026-02    $      +91  2.09x $     +191 $      209,533 $   52,336
+
+  COMPOUNDED RESULT:
+    Starting Equity:  $     100,000
+    Final Equity:     $     209,533
+    Total Profit:     $    +109,533
+    Return:                 109.5%
+
+
+========================================================================================================
+  GRAND COMPARISON -- PATH TO $70-80K/YEAR
+========================================================================================================
+  Config                            Raw P&L   Slippage    Net P&L    Mo. Avg     Annual     WR  Trades  MaxDD
+  ------------------------------ ---------- ---------- ---------- ---------- ---------- ------ ------- ------
+  VWAP+ORB 5sym $17K             $  +26,941 $   21,087 $   +5,854 $     +455 $   +5,464  49.7%   12404  12.6%
+  VWAP+ORB 5sym $25K             $  +41,074 $   28,878 $  +12,196 $     +949 $  +11,383  50.2%   11551  15.7%
+  VWAP+ORB 5sym $30K             $  +57,347 $   32,019 $  +25,328 $   +1,970 $  +23,640  50.9%   10673  16.1%
+  VWAP+ORB 5sym $35K             $  +81,172 $   35,735 $  +45,437 $   +3,534 $  +42,408  51.4%   10210  11.9%
+  VWAP+ORB 8sym $17K             $  +35,459 $   29,439 $   +6,020 $     +468 $   +5,619  50.7%   17317  17.0%
+  VWAP+ORB 8sym $25K             $  +81,186 $   38,132 $  +43,054 $   +3,349 $  +40,184  52.0%   15253  10.7%
+  VWAP+ORB 8sym $30K             $  +92,377 $   42,747 $  +49,630 $   +3,860 $  +46,321  52.5%   14249  11.8%
+  VWAP+ORB 8sym $35K             $ +136,313 $   46,812 $  +89,500 $   +6,961 $  +83,534  53.0%   13375  11.1%
+========================================================================================================
+
+
+======================================================================
+  TARGET ANALYSIS: $70-80K/YEAR
+======================================================================
+
+  BEST CONFIG: VWAP+ORB 8sym $35K
+    Annual (slippage-adjusted): $+83,534
+    Monthly Average:            $+6,961
+    Max Drawdown:               11.15%
+    Win Rate:                   53.0%
+    Total Trades:               13,375
+
+  VWAP+ORB 5sym $17K             => $   +5,464/yr  (7% of $75K target)
+
+  VWAP+ORB 5sym $25K             => $  +11,383/yr  (15% of $75K target)
+
+  VWAP+ORB 5sym $30K             => $  +23,640/yr  (32% of $75K target)
+
+  VWAP+ORB 5sym $35K             => $  +42,408/yr  (57% of $75K target)
+
+  VWAP+ORB 8sym $17K             => $   +5,619/yr  (7% of $75K target)
+
+  VWAP+ORB 8sym $25K             => $  +40,184/yr  (54% of $75K target)
+
+  VWAP+ORB 8sym $30K             => $  +46,321/yr  (62% of $75K target)
+
+  VWAP+ORB 8sym $35K             => $  +83,534/yr  (111% of $75K target)
+
+  TARGET $75K: ACHIEVED! Surplus: $+8,534/yr
+
+
+======================================================================
+  RECOMMENDATIONS TO HIT $70-80K/yr
+======================================================================
+
+  1. Use BASELINE strategy (no trailing stop, no EMA filter)
+  2. Enable midday filter only (proven +6.6% boost)
+  3. Scale order sizes to match buying power
+  4. Expand to 8-12 high-liquidity symbols
+  5. Compound monthly (scale orders with equity growth)
+  6. Reduce trade frequency to cut slippage costs
+  7. Widen VWAP_BOUNCE_PCT to reduce false entries
+  8. Add per-symbol parameter tuning
+  9. Consider adding SPY, QQQ, NFLX, COIN
+ 10. Run paper trading for 2-4 weeks before going live
+

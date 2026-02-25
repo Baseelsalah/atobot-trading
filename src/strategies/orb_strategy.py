@@ -1,8 +1,15 @@
 """Opening Range Breakout (ORB) day-trading strategy for AtoBot.
 
 Monitors the first N minutes of trading to establish the opening range
-(high/low), then enters on a confirmed breakout above the range high or
-below the range low with a market order.
+(high/low), then enters on a confirmed breakout above the range high.
+
+**v3 research-driven** (backtest validated):
+- MACD death cross exit REMOVED (82% over-triggering on 1-min bars)
+- MACD entry confirmation REMOVED (was filtering valid breakouts)
+- Volume confirmation is now BLOCKING (not advisory)
+- Brackets REMOVED (cutting avg win to $74 vs $122 avg loss)
+- EMA trend filter kept (maintains 60% win rate vs 53% without)
+- One trade per day per symbol preserved
 """
 
 from __future__ import annotations
@@ -10,9 +17,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pandas as pd
 from loguru import logger
 
 from src.config.settings import Settings
+from src.data import indicators
 from src.exchange.base_client import BaseExchangeClient
 from src.models.order import Order, OrderSide, OrderType
 from src.models.position import Position
@@ -104,6 +113,10 @@ class ORBStrategy(BaseStrategy):
                     logger.info("[ORB] TRAILING STOP {} | PnL%={:.2f}", symbol, pos.unrealized_pnl_percent)
                 return orders
 
+            # MACD death cross exit REMOVED in v3
+            # Backtest proved MACD was 82% of all ORB exits (over-triggering)
+            # Trailing stop + TP/SL are sufficient for exit management
+
             if pos.unrealized_pnl_percent >= tp:
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
@@ -182,7 +195,32 @@ class ORBStrategy(BaseStrategy):
         order_usd = Decimal(str(self.settings.ORB_ORDER_SIZE_USD))
 
         if current_price >= breakout_high:
-            # Bullish breakout → BUY
+            # ── Volume confirmation for breakout (BLOCKING in v3) ────
+            volume_ok = True
+            try:
+                bars_5m = await self.exchange.get_klines(symbol, "5m", 40)
+                if len(bars_5m) >= 20:
+                    df = pd.DataFrame(bars_5m)
+                    for col in ("open", "high", "low", "close", "volume"):
+                        df[col] = df[col].astype(float)
+
+                    # Volume must be >= 1.3x average for valid breakout
+                    vol_sma = indicators.volume_sma(df, 20)
+                    cur_vol = df["volume"].iloc[-1]
+                    avg_vol = vol_sma.iloc[-1]
+                    if avg_vol > 0:
+                        volume_ok = cur_vol >= avg_vol * 1.3
+                        if not volume_ok:
+                            logger.info(
+                                "[ORB] BLOCKED weak volume {} | vol {:.0f} < 1.3x avg {:.0f}",
+                                symbol, cur_vol, avg_vol,
+                            )
+                            return orders
+            except Exception as exc:
+                logger.debug("[ORB] Volume check error for {}: {}", symbol, exc)
+
+            # MACD confirmation REMOVED in v3 (over-filtered valid breakouts)
+            # Bullish breakout with volume confirmation -> BUY
             quantity = order_usd / current_price
             quantity = round_quantity(quantity, filters["step_size"])
             if quantity > Decimal("0"):
@@ -193,13 +231,12 @@ class ORBStrategy(BaseStrategy):
                 ))
                 self._traded_today[symbol] = True
                 logger.info(
-                    "[ORB] BREAKOUT BUY {} | price={} > high={}",
+                    "[ORB] BREAKOUT BUY {} | price={} > high={} | volume confirmed",
                     symbol, current_price, breakout_high,
                 )
 
         elif current_price <= breakout_low:
             # Bearish breakdown — for now we skip (long-only).
-            # Could short here if account allows it.
             logger.debug(
                 "[ORB] Breakdown {} — skipping (long-only)", symbol
             )

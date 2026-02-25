@@ -240,11 +240,17 @@ class EMAPullbackStrategy(BaseStrategy):
                 return orders
 
             # ── All conditions met — enter ──
-            order_usd = Decimal(str(
-                getattr(self.settings, "EMA_PULLBACK_ORDER_SIZE_USD",
-                        self.settings.BASE_ORDER_SIZE_USD)
-            ))
-            quantity = order_usd / current_price
+            # Confluence gate (v5: multi-indicator quality filter)
+            if not await self.passes_confluence_gate(symbol):
+                return orders
+
+            # Dynamic position sizing (v5: Kelly + 2% risk + progressive)
+            quantity = await self.compute_dynamic_quantity(
+                symbol, current_price,
+                fallback_usd=getattr(self.settings, "EMA_PULLBACK_ORDER_SIZE_USD",
+                                     self.settings.BASE_ORDER_SIZE_USD),
+                stop_loss_pct=self.settings.EMA_PULLBACK_STOP_LOSS_PERCENT,
+            )
             quantity = round_quantity(quantity, filters["step_size"])
 
             if quantity > Decimal("0"):
@@ -284,7 +290,14 @@ class EMAPullbackStrategy(BaseStrategy):
         elif order.side == OrderSide.SELL:
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
+                # Track win/loss for progressive risk scaling (v5)
+                pnl = pos.unrealized_pnl
                 pos.reduce_position(order.filled_quantity, order.price)
+                if pos.is_closed:
+                    if pnl > Decimal("0"):
+                        self.record_win()
+                    else:
+                        self.record_loss()
             if pos and pos.is_closed:
                 self._reset_trailing_high(symbol)
 

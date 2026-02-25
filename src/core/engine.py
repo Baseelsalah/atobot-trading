@@ -11,12 +11,15 @@ from loguru import logger
 from src.config.settings import Settings
 from src.data.market_data import MarketDataProvider
 from src.exchange.base_client import BaseExchangeClient
+from src.intelligence.ai_advisor import AITradeAdvisor
 from src.models.order import Order, OrderSide, OrderStatus
 from src.models.trade import Trade
 from src.notifications.base_notifier import BaseNotifier
 from src.persistence.repository import TradingRepository
+from src.risk.position_sizer import PositionSizer
 from src.risk.risk_manager import RiskManager
 from src.strategies.base_strategy import BaseStrategy
+from src.strategies.strategy_selector import AdaptiveStrategySelector
 from src.utils.helpers import calculate_pnl, decimal_from_str, format_usd
 
 
@@ -35,6 +38,12 @@ class TradingEngine:
         strategies: list[BaseStrategy] | None = None,
         # Legacy single-strategy support (for backward compat / tests)
         strategy: BaseStrategy | None = None,
+        # AI advisor (optional)
+        ai_advisor: AITradeAdvisor | None = None,
+        # Scanner suite (optional)
+        scanner: "MarketScanner | None" = None,
+        news_intel: "NewsIntelligence | None" = None,
+        regime_detector: "MarketRegimeDetector | None" = None,
     ) -> None:
         self.exchange = exchange
         # Support both single strategy (legacy/tests) and multi-strategy
@@ -51,11 +60,46 @@ class TradingEngine:
         self.repository = repository
         self.notifier = notifier
         self.settings = settings
+        self.ai_advisor = ai_advisor
+        self.scanner = scanner
+        self.news_intel = news_intel
+        self.regime_detector = regime_detector
         self._stop_event = asyncio.Event()
+
+        # ── Adaptive strategy selector (auto-created if regime detector exists) ──
+        self.strategy_selector: AdaptiveStrategySelector | None = None
+        if self.regime_detector:
+            self.strategy_selector = AdaptiveStrategySelector()
+            for strat in self.strategies:
+                self.strategy_selector.register_strategy(strat.name)
+            logger.info("Strategy selector enabled with {} strategies", len(self.strategies))
+
+        # ── Position Sizer (v5: Kelly + 2% risk + portfolio heat) ─────────
+        self.position_sizer = PositionSizer(
+            account_size=100_000.0,  # Updated on first balance fetch
+            max_risk_per_trade=getattr(settings, "MAX_RISK_PER_TRADE", 0.02),
+            max_portfolio_heat=getattr(settings, "MAX_PORTFOLIO_HEAT", 0.06),
+            max_position_pct=getattr(settings, "MAX_POSITION_PCT", 0.10),
+            kelly_fraction=getattr(settings, "KELLY_FRACTION", 0.5),
+            min_trade_history=getattr(settings, "MIN_KELLY_TRADES", 20),
+            max_sector_concentration=getattr(settings, "MAX_SECTOR_CONCENTRATION", 0.25),
+        )
+        # Inject into all strategies
+        for strat in self.strategies:
+            strat.set_position_sizer(self.position_sizer)
+        if self.strategies:
+            logger.info(
+                "PositionSizer injected | Kelly={} | max_risk={:.0%} | heat_cap={:.0%}",
+                settings.KELLY_SIZING_ENABLED,
+                self.position_sizer.max_risk_per_trade,
+                self.position_sizer.max_portfolio_heat,
+            )
+
         self._consecutive_errors = 0
         self._max_consecutive_errors = 3
         self._tick_count = 0
         self._heartbeat_interval = 60  # ticks
+        self._last_scan_tick = 0  # Track last intraday scan
 
     async def run(self) -> None:
         """Run the main trading loop.
@@ -77,10 +121,11 @@ class TradingEngine:
         shutdown.
         """
         logger.info(
-            "Trading engine starting | strategies={} | symbols={} | dry_run={}",
+            "Trading engine starting | strategies={} | symbols={} | dry_run={} | ai_advisor={}",
             [s.name for s in self.strategies],
             self.settings.SYMBOLS,
             self.settings.DRY_RUN,
+            bool(self.ai_advisor and self.ai_advisor._enabled),
         )
 
         while not self._stop_event.is_set():
@@ -143,16 +188,44 @@ class TradingEngine:
             balances = await self.exchange.get_account_balance()
             usd_balance = balances.get("USD", Decimal("0"))
             await self.risk.update_balance(usd_balance)
+            # Keep PositionSizer account size in sync (v5)
+            if float(usd_balance) > 0:
+                self.position_sizer.update_account_size(float(usd_balance))
         except Exception as exc:
             logger.warning("Could not fetch balance: {}", exc)
             balances = {}
+
+        # ── Process streaming trade updates (if available) ────────────────
+        await self._process_trade_updates()
+
+        # ── Process streaming news events (if available) ──────────────────
+        await self._process_news_events()
+
+        # ── Intraday scanner re-scan (if enabled) ────────────────────────
+        await self._run_intraday_scan()
+
+        # ── Regime detection update ───────────────────────────────────────
+        await self._update_regime()
 
         # ── Market hours check ────────────────────────────────────────────
         if self.settings.MARKET_HOURS_ONLY and hasattr(self.exchange, 'is_market_open'):
             try:
                 market_open = await self.exchange.is_market_open()
                 if not market_open:
-                    logger.debug("Market closed — skipping tick")
+                    if self._tick_count % 60 == 1:  # Log every ~5 min at 5s interval
+                        # Show next open from calendar if available
+                        next_open_str = ""
+                        if hasattr(self.exchange, 'get_next_market_open'):
+                            try:
+                                next_open = await self.exchange.get_next_market_open()
+                                if next_open:
+                                    next_open_str = f" | next open: {next_open.strftime('%Y-%m-%d %H:%M ET')}"
+                            except Exception:
+                                pass
+                        logger.info(
+                            "Market closed — waiting for market hours (tick #{}){}",
+                            self._tick_count, next_open_str,
+                        )
                     return
             except Exception as exc:
                 logger.warning("Could not check market hours: {}", exc)
@@ -201,6 +274,37 @@ class TradingEngine:
         if strat is None:
             return
 
+        # ── Halt detection (from streaming trading statuses) ──────────────
+        if hasattr(self.exchange, "is_symbol_halted") and self.exchange.is_symbol_halted(symbol):
+            logger.debug("Symbol {} is halted — skipping [{}]", symbol, strat.name)
+            return
+
+        # ── Scanner edge-score gate (skip low-score symbols) ─────────────
+        if self.scanner:
+            min_score = getattr(self.settings, "SCANNER_MIN_EDGE_SCORE", 0)
+            scan_result = self.scanner.get_symbol_scan(symbol)
+            if scan_result and scan_result.edge_score < min_score:
+                logger.debug(
+                    "Scanner: {} score={:.0f} < min={:.0f} — skipping [{}]",
+                    symbol, scan_result.edge_score, min_score, strat.name,
+                )
+                return
+
+        # ── News avoidance check ──────────────────────────────────────────
+        if self.news_intel:
+            should_avoid, reason = self.news_intel.should_avoid(symbol)
+            if should_avoid:
+                logger.info("News avoid: {} — {} [{}]", symbol, reason, strat.name)
+                return
+
+        # ── Risk-off regime check (reduce size or skip) ───────────────────
+        # Strategy selector gate (regime-aware enable/disable)
+        if self.strategy_selector:
+            allowed, reason = self.strategy_selector.should_trade(strat.name)
+            if not allowed:
+                logger.debug("Strategy selector: {} — {} [{}]", symbol, reason, strat.name)
+                return
+
         # 1. Fetch current price
         current_price = await self.market_data.get_current_price(symbol)
         logger.debug("Tick {} | {} [{}] = {}", self._tick_count, symbol, strat.name, current_price)
@@ -225,12 +329,81 @@ class TradingEngine:
 
         # 4 & 5. Validate and place orders
         for order in proposed_orders:
+            # Apply regime size multiplier to BUY orders
+            if self.strategy_selector and str(order.side).upper() == "BUY":
+                adjusted_qty = float(order.quantity) * self.strategy_selector.get_size_multiplier()
+                weight = self.strategy_selector.get_strategy_weight(strat.name)
+                adjusted_qty *= weight
+                adjusted_qty = max(1.0, adjusted_qty)
+                order.quantity = Decimal(str(int(adjusted_qty)))
+                if weight != 1.0 or self.strategy_selector.get_size_multiplier() != 1.0:
+                    logger.debug(
+                        "Size adjusted: {} qty={} (regime={:.2f}x, weight={:.2f}) [{}]",
+                        order.symbol, order.quantity,
+                        self.strategy_selector.get_size_multiplier(), weight, strat.name,
+                    )
+
             allowed, reason = await self.risk.can_place_order(order, balances)
             if not allowed:
                 logger.info(
                     "Order rejected by risk manager: {} | {} [{}]", reason, order.symbol, strat.name
                 )
                 continue
+
+            # AI advisor evaluation (if enabled)
+            if (
+                self.ai_advisor
+                and self.ai_advisor._enabled
+                and str(order.side).upper() == "BUY"
+            ):
+                try:
+                    indicators_data = {}
+                    bars = None
+                    try:
+                        bars_raw = await self.exchange.get_klines(order.symbol, "5m", 40)
+                        if bars_raw and len(bars_raw) >= 35:
+                            import pandas as pd
+                            from src.data import indicators as ind
+                            df = pd.DataFrame(bars_raw)
+                            for col in ("open", "high", "low", "close", "volume"):
+                                df[col] = df[col].astype(float)
+                            macd_info = ind.macd_signal(df)
+                            rsi_info = ind.rsi_bounce(df)
+                            indicators_data = {
+                                "macd": macd_info,
+                                "rsi": rsi_info,
+                                "strategy": strat.name,
+                            }
+                            bars = bars_raw[-5:]
+                    except Exception:
+                        pass
+
+                    ai_result = await self.ai_advisor.evaluate_entry(
+                        symbol=order.symbol,
+                        strategy=strat.name,
+                        current_price=float(current_price),
+                        indicators_data=indicators_data,
+                        recent_bars=bars,
+                    )
+                    if not ai_result.get("allow", True):
+                        logger.info(
+                            "Order blocked by AI advisor: {} | {} [{}] | confidence={:.0%} | {}",
+                            order.symbol, strat.name,
+                            ai_result.get("confidence", 0),
+                            ai_result.get("confidence", 0),
+                            ai_result.get("reason", "no reason"),
+                        )
+                        continue
+                    elif ai_result.get("confidence", 0.5) < self.settings.AI_MIN_CONFIDENCE:
+                        logger.info(
+                            "Order blocked by AI low confidence: {} [{}] | confidence={:.0%} (min={:.0%})",
+                            order.symbol, strat.name,
+                            ai_result.get("confidence", 0),
+                            self.settings.AI_MIN_CONFIDENCE,
+                        )
+                        continue
+                except Exception as exc:
+                    logger.debug("AI advisor error (allowing trade): {}", exc)
 
             if self.settings.DRY_RUN:
                 # Simulate placement
@@ -504,13 +677,309 @@ class TradingEngine:
                     exc,
                 )
 
+    # ── Streaming helpers ────────────────────────────────────────────────────
+
+    async def _process_trade_updates(self) -> None:
+        """Drain queued trade-update events pushed by the TradingStream.
+
+        Each event dict has keys: event (fill/partial_fill/canceled/rejected/…),
+        order (raw SDK order object dict), timestamp.
+        """
+        if not hasattr(self.exchange, "drain_trade_updates"):
+            return
+
+        events = await self.exchange.drain_trade_updates()
+        if not events:
+            return
+
+        for evt in events:
+            event_type = evt.get("event", "")
+            order_id = str(evt.get("order_id", ""))
+            symbol = evt.get("symbol", "")
+
+            logger.debug("Stream trade update: {} {} {}", event_type, symbol, order_id)
+
+            # Find the matching local order across all strategies
+            matched_order = None
+            matched_strat = None
+            for strat in self.strategies:
+                for o in strat.active_orders:
+                    if o.id == order_id and o.is_active:
+                        matched_order = o
+                        matched_strat = strat
+                        break
+                if matched_order:
+                    break
+
+            if not matched_order:
+                logger.debug("Stream update for unknown order {} — skipping", order_id)
+                continue
+
+            try:
+                if event_type == "fill":
+                    filled_qty = decimal_from_str(
+                        evt.get("filled_qty", str(matched_order.quantity))
+                    )
+                    raw_fill_price = evt.get("filled_avg_price")
+                    fill_price = (
+                        decimal_from_str(raw_fill_price)
+                        if raw_fill_price
+                        else matched_order.price
+                    )
+                    matched_order.mark_filled(filled_qty)
+
+                    logger.info(
+                        "Stream FILL | {} {} @ {} qty={} [{}]",
+                        matched_order.side, symbol, fill_price,
+                        filled_qty, matched_strat.name,
+                    )
+
+                    trade_pnl = None
+                    pos = matched_strat.positions.get(symbol)
+                    if str(matched_order.side).upper() == "SELL" and pos and not pos.is_closed:
+                        trade_pnl = calculate_pnl(
+                            pos.entry_price, fill_price, filled_qty, "BUY"
+                        )
+
+                    trade = Trade(
+                        symbol=symbol,
+                        side=matched_order.side,
+                        price=fill_price,
+                        quantity=filled_qty,
+                        fee=decimal_from_str(evt.get("commission", "0")),
+                        fee_asset="USD",
+                        pnl=trade_pnl,
+                        strategy=matched_order.strategy,
+                        order_id=matched_order.internal_id,
+                    )
+
+                    if self.notifier:
+                        await self.notifier.send_trade_alert(trade)
+                    try:
+                        await self.repository.save_trade(trade)
+                    except Exception as exc:
+                        logger.error("Failed to save stream trade: {}", exc)
+
+                    follow_up = await matched_strat.on_order_filled(matched_order)
+                    for fo in follow_up:
+                        matched_strat.active_orders.append(fo)
+
+                    try:
+                        await self.repository.update_order(matched_order)
+                    except Exception as exc:
+                        logger.error("Failed to update stream order: {}", exc)
+
+                    self.risk.record_trade(trade.pnl)
+                    if trade.pnl is not None:
+                        await self.risk.update_daily_pnl(trade.pnl)
+
+                elif event_type == "partial_fill":
+                    filled_qty = decimal_from_str(
+                        evt.get("filled_qty", "0")
+                    )
+                    prev_filled = matched_order.filled_quantity
+                    new_fill = filled_qty - prev_filled
+                    if new_fill > Decimal("0"):
+                        matched_order.filled_quantity = filled_qty
+                        matched_order.status = OrderStatus.PARTIALLY_FILLED
+
+                        raw_fill_price = evt.get("filled_avg_price")
+                        fill_price = (
+                            decimal_from_str(raw_fill_price)
+                            if raw_fill_price
+                            else matched_order.price
+                        )
+
+                        trade_pnl = None
+                        pos = matched_strat.positions.get(symbol)
+                        if str(matched_order.side).upper() == "SELL" and pos and not pos.is_closed:
+                            trade_pnl = calculate_pnl(
+                                pos.entry_price, fill_price, new_fill, "BUY"
+                            )
+
+                        trade = Trade(
+                            symbol=symbol,
+                            side=matched_order.side,
+                            price=fill_price,
+                            quantity=new_fill,
+                            fee=Decimal("0"),
+                            fee_asset="USD",
+                            pnl=trade_pnl,
+                            strategy=matched_order.strategy,
+                            order_id=matched_order.internal_id,
+                        )
+                        try:
+                            await self.repository.save_trade(trade)
+                        except Exception as exc:
+                            logger.error("Failed to save partial stream trade: {}", exc)
+
+                        self.risk.record_trade(trade.pnl)
+                        if trade.pnl is not None:
+                            await self.risk.update_daily_pnl(trade.pnl)
+
+                        logger.info(
+                            "Stream partial fill | {} {} @ {} new={} total={}/{} [{}]",
+                            matched_order.side, symbol, fill_price,
+                            new_fill, filled_qty, matched_order.quantity,
+                            matched_strat.name,
+                        )
+
+                elif event_type in ("canceled", "expired", "replaced"):
+                    matched_order.mark_cancelled()
+                    await matched_strat.on_order_cancelled(matched_order)
+                    try:
+                        await self.repository.update_order(matched_order)
+                    except Exception as exc:
+                        logger.error("Failed to update cancelled stream order: {}", exc)
+                    logger.info(
+                        "Stream {} | {} {} [{}]",
+                        event_type, symbol, order_id, matched_strat.name,
+                    )
+
+                elif event_type == "rejected":
+                    matched_order.mark_failed({"reason": "rejected_by_exchange"})
+                    logger.warning(
+                        "Stream REJECTED | {} {} [{}]",
+                        symbol, order_id, matched_strat.name,
+                    )
+
+            except Exception as exc:
+                logger.error("Error processing stream trade update: {}", exc)
+
+    async def _process_news_events(self) -> None:
+        """Drain queued news events and classify via News Intelligence."""
+        if not hasattr(self.exchange, "drain_news_events"):
+            return
+
+        events = await self.exchange.drain_news_events()
+        if not events:
+            return
+
+        for evt in events:
+            try:
+                headline = evt.get("headline", "")
+                symbols = evt.get("symbols", [])
+                # Only process news for symbols we are actually trading
+                relevant = [s for s in symbols if s in self.settings.SYMBOLS]
+                if not relevant:
+                    continue
+
+                logger.info("News event for {}: {}", relevant, headline[:80])
+
+                # Classify via News Intelligence (instant, no API calls)
+                if self.news_intel:
+                    news_event = await self.news_intel.classify(evt)
+                    if news_event.actionable and self.notifier:
+                        await self.notifier.send_message(
+                            f"🚨 News T{news_event.tier}: {', '.join(relevant)} — "
+                            f"{headline[:120]} | {news_event.suggested_action}"
+                        )
+
+                # Legacy AI advisor analysis (if available and no news_intel)
+                elif self.ai_advisor and self.ai_advisor._enabled:
+                    if hasattr(self.ai_advisor, "analyze_news"):
+                        result = await self.ai_advisor.analyze_news(
+                            headline=headline,
+                            symbols=relevant,
+                            source=evt.get("source", ""),
+                            summary=evt.get("summary", ""),
+                        )
+                        if result and result.get("risk_flag"):
+                            logger.warning(
+                                "AI news risk flag — {} | {}",
+                                relevant, result.get("reason", ""),
+                            )
+                            if self.notifier:
+                                await self.notifier.send_message(
+                                    f"📰 News risk: {', '.join(relevant)} — {headline[:120]}"
+                                )
+            except Exception as exc:
+                logger.debug("Error processing news event: {}", exc)
+
+    async def _run_intraday_scan(self) -> None:
+        """Periodically re-scan the market for new setups."""
+        if not self.scanner:
+            return
+
+        scan_interval = getattr(self.settings, "SCANNER_INTERVAL_SECONDS", 60)
+        poll_interval = self.settings.POLL_INTERVAL_SECONDS
+        ticks_between_scans = max(1, int(scan_interval / poll_interval))
+
+        if (self._tick_count - self._last_scan_tick) < ticks_between_scans:
+            return
+
+        self._last_scan_tick = self._tick_count
+        try:
+            results = await self.scanner.intraday_scan()
+            if results:
+                top = results[:3]
+                logger.info(
+                    "Intraday scan: {} results | top: {}",
+                    len(results),
+                    [(r.symbol, r.signal.value, f"{r.edge_score:.0f}") for r in top],
+                )
+        except Exception as exc:
+            logger.debug("Intraday scan error: {}", exc)
+
+    async def _update_regime(self) -> None:
+        """Update market regime detection every ~60 seconds."""
+        if not self.regime_detector:
+            return
+
+        # Only update every 12 ticks (~60s at 5s poll)
+        if self._tick_count % 12 != 0:
+            return
+
+        try:
+            # Try to get SPY bars for trend detection
+            spy_bars = None
+            vix_level = None
+            try:
+                import pandas as pd
+                bars_raw = await self.exchange.get_klines("SPY", "5m", 30)
+                if bars_raw and len(bars_raw) >= 20:
+                    spy_bars = pd.DataFrame(bars_raw)
+                    for col in ("open", "high", "low", "close", "volume"):
+                        if col in spy_bars.columns:
+                            spy_bars[col] = spy_bars[col].astype(float)
+            except Exception:
+                pass
+
+            regime = await self.regime_detector.update(
+                spy_bars=spy_bars,
+                vix_level=vix_level,
+            )
+
+            # Update strategy selector with new regime weights
+            if self.strategy_selector:
+                self.strategy_selector.update_from_regime(self.regime_detector)
+
+            # Sync regime multiplier to PositionSizer (v5)
+            if hasattr(regime, "size_multiplier"):
+                self.position_sizer.update_regime_multiplier(regime.size_multiplier)
+
+            if not regime.is_favorable():
+                logger.info("Regime unfavorable: {} — trading cautiously", regime.summary())
+        except Exception as exc:
+            logger.debug("Regime update error: {}", exc)
+
     async def _send_heartbeat(self) -> None:
         """Send a periodic status update."""
         try:
             all_status = {}
             for strat in self.strategies:
                 all_status[strat.name] = await strat.get_status()
-            logger.info("Heartbeat | tick={} | strategies={}", self._tick_count, list(all_status.keys()))
+
+            # Include regime info in heartbeat
+            regime_str = ""
+            if self.regime_detector:
+                r = self.regime_detector.current
+                regime_str = f" | regime={r.trend.value}/{r.volatility.value} size={r.size_multiplier:.1f}x"
+
+            logger.info(
+                "Heartbeat | tick={} | strategies={}{}", self._tick_count,
+                list(all_status.keys()), regime_str,
+            )
             if self.notifier:
                 lines = [f"💓 Heartbeat | Tick #{self._tick_count}"]
                 for name, status in all_status.items():

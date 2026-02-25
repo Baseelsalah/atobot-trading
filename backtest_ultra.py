@@ -832,6 +832,13 @@ def run_momentum_ultra(bars_5m: dict[str, list[dict]]) -> Result:
                             aw = strategy_total_win / max(strategy_wins, 1)
                             al = strategy_total_loss / max(strategy_losses, 1)
                             order_usd = _kelly_size(wr, aw, al, res.cash, price, sl_pct)
+
+                            # Progressive risk scaling (v5: reduce after losses)
+                            cl = consecutive_losses.get(sym, 0)
+                            if cl > 0:
+                                prog_mult = max(0.25, 0.75 ** cl)
+                                order_usd *= prog_mult
+
                             qty = order_usd / price
                             cost = qty * price
 
@@ -1137,6 +1144,13 @@ def run_vwap_ultra(bars_5m: dict[str, list[dict]]) -> Result:
                         al = strategy_total_loss / max(strategy_losses, 1)
                         order_usd = _kelly_size(wr, aw, al, res.cash, price, sl_pct)
                         order_usd = max(order_usd, ORDER_SIZE_USD)  # Never smaller than baseline
+
+                        # Progressive risk scaling (v5: reduce after losses)
+                        cl = consecutive_losses.get(sym, 0)
+                        if cl > 0:
+                            prog_mult = max(0.25, 0.75 ** cl)
+                            order_usd *= prog_mult
+
                         qty = order_usd / price
                         cost = qty * price
 
@@ -1455,6 +1469,13 @@ def run_orb_ultra(bars_1m: dict[str, list[dict]]) -> Result:
                         aw = strategy_total_win / max(strategy_wins, 1)
                         al = strategy_total_loss / max(strategy_losses, 1)
                         order_usd = _kelly_size(wr, aw, al, res.cash, price, sl_pct)
+
+                        # Progressive risk scaling (v5: reduce after losses)
+                        cl = consecutive_losses.get(sym, 0)
+                        if cl > 0:
+                            prog_mult = max(0.25, 0.75 ** cl)
+                            order_usd *= prog_mult
+
                         qty = order_usd / price
                         cost = qty * price
 
@@ -1922,6 +1943,13 @@ def run_ema_pullback_ultra(bars_5m: dict[str, list[dict]]) -> Result:
                     al = strategy_total_loss / max(strategy_losses, 1)
                     order_usd = _kelly_size(wr, aw, al, res.cash, price, sl_pct)
                     order_usd = max(order_usd, ORDER_SIZE_USD)  # Never smaller than baseline
+
+                    # Progressive risk scaling (v5: reduce after losses)
+                    cl = consecutive_losses.get(sym, 0)
+                    if cl > 0:
+                        prog_mult = max(0.25, 0.75 ** cl)
+                        order_usd *= prog_mult
+
                     qty = order_usd / price
                     cost = qty * price
 
