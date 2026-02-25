@@ -10,12 +10,17 @@ from src.config.settings import Settings
 from src.core.engine import TradingEngine
 from src.data.market_data import MarketDataProvider
 from src.exchange.base_client import BaseExchangeClient
+from src.intelligence.ai_advisor import AITradeAdvisor
 from src.notifications.base_notifier import BaseNotifier
 from src.notifications.telegram_notifier import TelegramNotifier
 from src.persistence.database import close_database, init_database
 from src.persistence.repository import TradingRepository
 from src.risk.risk_manager import RiskManager
+from src.scanner.market_scanner import MarketScanner
+from src.scanner.news_intel import NewsIntelligence
+from src.scanner.regime_detector import MarketRegimeDetector
 from src.strategies.base_strategy import BaseStrategy
+from src.strategies.ema_pullback_strategy import EMAPullbackStrategy
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.orb_strategy import ORBStrategy
 from src.strategies.vwap_strategy import VWAPScalpStrategy
@@ -33,6 +38,10 @@ class AtoBot:
         self.market_data: MarketDataProvider | None = None
         self.notifier: BaseNotifier | None = None
         self.repository: TradingRepository | None = None
+        self.ai_advisor: AITradeAdvisor | None = None
+        self.scanner: MarketScanner | None = None
+        self.news_intel: NewsIntelligence | None = None
+        self.regime_detector: MarketRegimeDetector | None = None
         self.engine: TradingEngine | None = None
         self._shutdown_event = asyncio.Event()
 
@@ -92,6 +101,27 @@ class AtoBot:
             self.notifier = None
             logger.info("Notifications disabled")
 
+        # AI Advisor (OpenAI-powered trade evaluation)
+        if self.settings.AI_ADVISOR_ENABLED and self.settings.OPENAI_API_KEY:
+            self.ai_advisor = AITradeAdvisor(
+                api_key=self.settings.OPENAI_API_KEY,
+                model=self.settings.OPENAI_MODEL,
+            )
+            await self.ai_advisor.initialize()
+            if self.ai_advisor._enabled:
+                logger.info("AI Trade Advisor enabled (model={})", self.settings.OPENAI_MODEL)
+                # Generate pre-market briefing
+                try:
+                    briefing = await self.ai_advisor.generate_market_briefing(self.settings.SYMBOLS)
+                    logger.info("AI Market Briefing:\n{}", briefing)
+                    if self.notifier:
+                        await self.notifier.send_message(f"🤖 AI Market Briefing:\n{briefing}")
+                except Exception as exc:
+                    logger.warning("AI briefing failed: {}", exc)
+        else:
+            self.ai_advisor = None
+            logger.info("AI Advisor disabled (set OPENAI_API_KEY to enable)")
+
         # 6. Load previous state
         try:
             state = await self.repository.load_bot_state()
@@ -112,6 +142,15 @@ class AtoBot:
         # 7b. Reconcile positions — sync in-memory state with exchange
         await self._reconcile_positions()
 
+        # 7c. Start WebSocket streams (if enabled and supported)
+        await self._start_streams()
+
+        # 7d. Check corporate announcements (earnings/splits risk)
+        await self._check_corporate_announcements()
+
+        # 7e. Initialize Market Scanner, News Intelligence, Regime Detector
+        await self._init_scanner_suite()
+
         # 8. Create and run engine
         self.engine = TradingEngine(
             exchange=self.exchange,
@@ -121,6 +160,10 @@ class AtoBot:
             repository=self.repository,
             notifier=self.notifier,
             settings=self.settings,
+            ai_advisor=self.ai_advisor,
+            scanner=self.scanner,
+            news_intel=self.news_intel,
+            regime_detector=self.regime_detector,
         )
 
         # 9. Startup notification
@@ -226,6 +269,7 @@ class AtoBot:
             "momentum": MomentumStrategy,
             "orb": ORBStrategy,
             "vwap_scalp": VWAPScalpStrategy,
+            "ema_pullback": EMAPullbackStrategy,
         }
         strategies = []
         for name in self.settings.STRATEGIES:
@@ -237,13 +281,144 @@ class AtoBot:
             raise ValueError("No strategies configured")
         return strategies
 
+    async def _start_streams(self) -> None:
+        """Launch WebSocket streaming for prices, order updates, and news."""
+        if not self.exchange or not hasattr(self.exchange, "start_streams"):
+            return
+
+        streaming = getattr(self.settings, "STREAMING_ENABLED", False)
+        trade_stream = getattr(self.settings, "TRADE_STREAM_ENABLED", False)
+        news_stream = getattr(self.settings, "NEWS_STREAM_ENABLED", False)
+
+        if not any([streaming, trade_stream, news_stream]):
+            logger.info("All streaming disabled — using REST polling only")
+            return
+
+        try:
+            await self.exchange.start_streams(self.settings.SYMBOLS)
+
+            status_parts = []
+            if streaming and hasattr(self.exchange, "is_streaming") and self.exchange.is_streaming():
+                status_parts.append("prices")
+            if trade_stream and hasattr(self.exchange, "is_trade_streaming") and self.exchange.is_trade_streaming():
+                status_parts.append("trades")
+            if news_stream:
+                status_parts.append("news")
+
+            if status_parts:
+                logger.info("WebSocket streams active: {}", ", ".join(status_parts))
+                # Fetch data feed info
+                data_feed = getattr(self.settings, "DATA_FEED", "iex")
+                logger.info("Data feed: {} ({})", data_feed.upper(), "free" if data_feed == "iex" else "paid SIP")
+            else:
+                logger.info("WebSocket streams configured but not yet connected")
+        except Exception as exc:
+            logger.warning("Failed to start streams (falling back to REST): {}", exc)
+
+    async def _check_corporate_announcements(self) -> None:
+        """Check for upcoming earnings/splits that could affect our symbols."""
+        if not self.exchange or not hasattr(self.exchange, "get_corporate_announcements"):
+            return
+
+        try:
+            from datetime import datetime, timedelta, timezone
+
+            now = datetime.now(timezone.utc)
+            since = now - timedelta(days=1)
+            until = now + timedelta(days=2)
+
+            announcements = await self.exchange.get_corporate_announcements(
+                ca_types=["Dividend", "Merger", "Spinoff", "Split"],
+                since=since,
+                until=until,
+            )
+            if announcements:
+                for ann in announcements[:10]:  # Cap at 10 announcements
+                    symbol = getattr(ann, "symbol", "?")
+                    ca_type = getattr(ann, "ca_type", "?")
+                    ca_sub_type = getattr(ann, "ca_sub_type", "")
+                    if symbol in self.settings.SYMBOLS:
+                        logger.warning(
+                            "⚠️ Corporate action for {}: {} {} — trade with caution",
+                            symbol, ca_type, ca_sub_type,
+                        )
+                        if self.notifier:
+                            await self.notifier.send_message(
+                                f"⚠️ Corporate action: {symbol} — {ca_type} {ca_sub_type}"
+                            )
+                logger.info(
+                    "Corporate announcements check: {} found in date range",
+                    len(announcements),
+                )
+            else:
+                logger.debug("No corporate announcements found for date range")
+        except Exception as exc:
+            logger.debug("Corporate announcements check skipped: {}", exc)
+
+    async def _init_scanner_suite(self) -> None:
+        """Initialize the Market Scanner, News Intelligence, and Regime Detector."""
+        # Market Scanner
+        if getattr(self.settings, "SCANNER_ENABLED", False):
+            try:
+                self.scanner = MarketScanner(
+                    exchange=self.exchange,
+                    settings=self.settings,
+                )
+                logger.info("Market Scanner enabled")
+
+                # Run pre-market scan
+                try:
+                    results = await self.scanner.pre_market_scan()
+                    ctx = self.scanner.get_market_context()
+                    logger.info(
+                        "Pre-market scan: {} results | SPY={:.2f} ({:+.1f}%) | risk_off={}",
+                        len(results),
+                        ctx.spy_price if ctx else 0,
+                        ctx.spy_change_pct if ctx else 0,
+                        ctx.risk_off if ctx else False,
+                    )
+                    if results and self.notifier:
+                        top = results[:5]
+                        lines = ["🔍 Pre-Market Scanner:"]
+                        for r in top:
+                            lines.append(
+                                f"  {r.symbol} | {r.signal.value} | "
+                                f"score={r.edge_score:.0f} gap={r.gap_percent:+.1f}% "
+                                f"rvol={r.relative_volume:.1f}x"
+                            )
+                        await self.notifier.send_message("\n".join(lines))
+                except Exception as exc:
+                    logger.warning("Pre-market scan failed: {}", exc)
+            except Exception as exc:
+                logger.warning("Scanner init failed: {}", exc)
+
+        # News Intelligence
+        if getattr(self.settings, "NEWS_INTEL_ENABLED", False):
+            try:
+                self.news_intel = NewsIntelligence(ai_advisor=self.ai_advisor)
+                logger.info("News Intelligence enabled")
+            except Exception as exc:
+                logger.warning("News Intelligence init failed: {}", exc)
+
+        # Market Regime Detector
+        if getattr(self.settings, "REGIME_DETECTION_ENABLED", False):
+            try:
+                self.regime_detector = MarketRegimeDetector(
+                    exchange=self.exchange,
+                    settings=self.settings,
+                )
+                logger.info("Market Regime Detector enabled")
+            except Exception as exc:
+                logger.warning("Regime Detector init failed: {}", exc)
+
     async def _reconcile_positions(self) -> None:
         """Sync in-memory strategy positions with actual exchange positions.
 
         On restart the bot has empty position dicts. If there are real
         open positions on the exchange (e.g. from a previous session that
-        crashed), we load them into the *first* strategy so they get
-        managed (stop-loss, exit logic) rather than being orphaned.
+        crashed), we handle them:
+        - LONG positions in our SYMBOLS list → track in first strategy
+        - SHORT positions or unknown symbols → close immediately (we are long-only)
         """
         if not self.exchange or not hasattr(self.exchange, "get_positions"):
             return
@@ -270,6 +445,10 @@ class AtoBot:
 
         from src.models.position import Position
 
+        managed_symbols = {s.upper() for s in self.settings.SYMBOLS}
+        newly_tracked = 0
+        closed_orphans = 0
+
         for pos_data in exchange_positions:
             symbol = pos_data["symbol"]
             if symbol in tracked:
@@ -277,6 +456,25 @@ class AtoBot:
                 continue
 
             side = "LONG" if str(pos_data.get("side", "long")).lower() == "long" else "SHORT"
+
+            # Close SHORT positions and positions not in our SYMBOLS list
+            # We are a long-only day-trading bot
+            if side == "SHORT" or symbol not in managed_symbols:
+                reason = "SHORT position (we are long-only)" if side == "SHORT" else f"{symbol} not in managed SYMBOLS"
+                logger.warning(
+                    "Closing orphaned position: {} {} qty={} | Reason: {}",
+                    side, symbol, abs(pos_data["qty"]), reason,
+                )
+                if not self.settings.DRY_RUN and hasattr(self.exchange, 'close_position'):
+                    try:
+                        await self.exchange.close_position(symbol)
+                        closed_orphans += 1
+                        logger.info("Closed orphaned position: {} {}", side, symbol)
+                    except Exception as exc:
+                        logger.error("Failed to close orphaned position {}: {}", symbol, exc)
+                continue
+
+            # Track LONG positions in our symbol list
             position = Position(
                 symbol=symbol,
                 side=side,
@@ -288,6 +486,7 @@ class AtoBot:
             primary.positions[symbol] = position
             # Seed trailing high for trailing stop
             primary._trailing_highs[symbol] = pos_data["current_price"]
+            newly_tracked += 1
             logger.info(
                 "Reconciled position: {} {} {} @ {} qty={} → [{}]",
                 side, symbol, position.entry_price,
@@ -295,7 +494,6 @@ class AtoBot:
             )
 
         logger.info(
-            "Position reconciliation complete: {} exchange positions, {} newly tracked",
-            len(exchange_positions),
-            len(exchange_positions) - len(tracked & {p["symbol"] for p in exchange_positions}),
+            "Position reconciliation complete: {} exchange positions, {} tracked, {} orphans closed",
+            len(exchange_positions), newly_tracked, closed_orphans,
         )

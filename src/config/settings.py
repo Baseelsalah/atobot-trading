@@ -30,10 +30,16 @@ class Settings(BaseSettings):
     BINANCE_API_SECRET: str = ""
     BINANCE_TESTNET: bool = True
 
+    # ── Streaming (WebSocket) ─────────────────────────────────────────────────
+    STREAMING_ENABLED: bool = True  # Real-time price stream via StockDataStream
+    TRADE_STREAM_ENABLED: bool = True  # Instant order fill/reject via TradingStream
+    NEWS_STREAM_ENABLED: bool = False  # Real-time news via NewsDataStream
+    DATA_FEED: str = "iex"  # "iex" (free) or "sip" (paid SIP consolidated)
+
     # ── Trading ───────────────────────────────────────────────────────────────
     SYMBOLS: list[str] = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD"]
-    DEFAULT_STRATEGY: str = "momentum"  # "momentum", "orb", "vwap_scalp"
-    STRATEGIES: list[str] = []  # Run multiple strategies: ["vwap_scalp", "orb"]
+    DEFAULT_STRATEGY: str = "vwap_scalp"  # VWAP is strongest strategy per backtest
+    STRATEGIES: list[str] = []  # Run multiple: ["vwap_scalp", "ema_pullback", "momentum"]
     BASE_ORDER_SIZE_USD: float = 500.0  # Base dollar amount per trade
     MAX_OPEN_ORDERS: int = 10
     FRACTIONAL_SHARES: bool = True  # Alpaca supports fractional shares
@@ -48,7 +54,7 @@ class Settings(BaseSettings):
     # ── Momentum Strategy ─────────────────────────────────────────────────────
     MOMENTUM_LOOKBACK_BARS: int = 20  # Bars for momentum calculation
     MOMENTUM_RSI_PERIOD: int = 14
-    MOMENTUM_RSI_OVERSOLD: float = 30.0  # Buy signal threshold
+    MOMENTUM_RSI_OVERSOLD: float = 32.0  # Buy signal threshold (backtest v2: 32)
     MOMENTUM_RSI_OVERBOUGHT: float = 70.0  # Sell signal threshold
     MOMENTUM_VOLUME_MULTIPLIER: float = 1.5  # Min relative volume to trade
     MOMENTUM_TAKE_PROFIT_PERCENT: float = 2.0
@@ -56,15 +62,26 @@ class Settings(BaseSettings):
 
     # ── ORB (Opening Range Breakout) Strategy ─────────────────────────────────
     ORB_RANGE_MINUTES: int = 15  # First N minutes to define opening range
-    ORB_BREAKOUT_PERCENT: float = 0.1  # % above/below range to confirm
-    ORB_TAKE_PROFIT_PERCENT: float = 1.5
-    ORB_STOP_LOSS_PERCENT: float = 0.75
+    ORB_BREAKOUT_PERCENT: float = 0.15  # % above range to confirm (backtest v3: 0.15)
+    ORB_TAKE_PROFIT_PERCENT: float = 1.5  # Single TP (no brackets in v3)
+    ORB_STOP_LOSS_PERCENT: float = 0.75  # Proven via backtest (0.50 too tight)
     ORB_ORDER_SIZE_USD: float = 500.0
 
+    # ── EMA Pullback Strategy ─────────────────────────────────────────────────
+    EMA_PULLBACK_FAST_PERIOD: int = 9     # Fast EMA for signal (9-bar)
+    EMA_PULLBACK_SLOW_PERIOD: int = 21    # Slow EMA for trend (21-bar)
+    EMA_PULLBACK_TREND_PERIOD: int = 50   # Higher-TF trend EMA (50-bar on 5m)
+    EMA_PULLBACK_RSI_OVERSOLD: float = 40.0  # RSI threshold for pullback zone
+    EMA_PULLBACK_RSI_OVERBOUGHT: float = 70.0  # RSI exit threshold
+    EMA_PULLBACK_VOLUME_MULTIPLIER: float = 1.2  # Min relative volume
+    EMA_PULLBACK_TAKE_PROFIT_PERCENT: float = 1.5  # TP %
+    EMA_PULLBACK_STOP_LOSS_PERCENT: float = 0.75  # SL %
+    EMA_PULLBACK_ORDER_SIZE_USD: float = 500.0
+
     # ── VWAP Scalp Strategy ───────────────────────────────────────────────────
-    VWAP_BOUNCE_PERCENT: float = 0.05  # % from VWAP to enter (stress test optimal)
+    VWAP_BOUNCE_PERCENT: float = 0.10  # backtest v2: 0.10% = +$11K vs 0.05% over-trading
     VWAP_TAKE_PROFIT_PERCENT: float = 0.5
-    VWAP_STOP_LOSS_PERCENT: float = 0.50  # Wider SL: 52%->62% WR, Sharpe 0.88
+    VWAP_STOP_LOSS_PERCENT: float = 0.30  # backtest v2: 0.30% optimal (was 0.50)
     VWAP_ORDER_SIZE_USD: float = 500.0
 
     # ── Trend Filter (EMA) ────────────────────────────────────────────────────
@@ -73,14 +90,29 @@ class Settings(BaseSettings):
     TREND_FILTER_TIMEFRAME: str = "15m"  # Timeframe for trend EMA bars
 
     # ── Time-of-Day Filter ────────────────────────────────────────────────────
-    AVOID_MIDDAY: bool = True  # Skip entries during lunch dead zone
+    AVOID_MIDDAY: bool = False  # v3: disabled for VWAP (needs all-session volume)
     MIDDAY_START_HOUR: int = 12  # Hour (ET) to start avoiding (noon)
     MIDDAY_END_HOUR: int = 14  # Hour (ET) to stop avoiding (2 PM)
 
     # ── Trailing Stop ─────────────────────────────────────────────────────────
-    TRAILING_STOP_ENABLED: bool = False  # Backtest: inactive at safe params, too aggressive when tight
+    TRAILING_STOP_ENABLED: bool = True  # v3: enabled (backtest shows trailing helps)
     TRAILING_STOP_ACTIVATION_PCT: float = 0.5  # Activate after 0.5% profit
     TRAILING_STOP_DISTANCE_PCT: float = 0.3  # Trail distance from high
+
+    # ── Market Scanner ─────────────────────────────────────────────────────────
+    SCANNER_ENABLED: bool = True  # Pre-market & intraday scanner
+    SCANNER_MIN_GAP_PCT: float = 2.0  # Minimum gap % for pre-market scan
+    SCANNER_MIN_RVOL: float = 1.5  # Minimum relative volume
+    SCANNER_MIN_EDGE_SCORE: float = 40.0  # Min edge score (0-100) to trade
+    SCANNER_MAX_RESULTS: int = 20  # Max symbols to surface per scan
+    SCANNER_INTERVAL_SECONDS: int = 60  # Intraday re-scan interval
+    SCANNER_UNIVERSE: str = ""  # Comma-separated symbols or empty for default
+
+    # ── News Intelligence ─────────────────────────────────────────────────────
+    NEWS_INTEL_ENABLED: bool = True  # Classify incoming news in real-time
+
+    # ── Market Regime Detection ───────────────────────────────────────────────
+    REGIME_DETECTION_ENABLED: bool = True  # Detect trend/vol/breadth regime
 
     # ── Stale Order Cleanup ───────────────────────────────────────────────────
     STALE_ORDER_MAX_AGE_SECONDS: int = 1800  # Cancel limit orders older than 30 min
@@ -100,6 +132,52 @@ class Settings(BaseSettings):
     PDT_PROTECTION: bool = True  # Block trades that would trigger PDT rule
     RISK_PER_TRADE_PERCENT: float = 1.0  # Max % of portfolio risked per trade
     MAX_PORTFOLIO_HEAT: float = 6.0  # Max total % of portfolio at risk
+
+    # ── OpenAI / AI Advisor ───────────────────────────────────────────────────
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"  # Cost-effective for trade analysis
+    AI_ADVISOR_ENABLED: bool = False  # Enable AI-powered trade evaluation
+    AI_MIN_CONFIDENCE: float = 0.4  # Min AI confidence to allow trade (0-1)
+    AI_MAX_DAILY_CALLS: int = 200  # Max OpenAI API calls per day
+
+    # ── Ultra Bot: Smart Order Manager ────────────────────────────────────────
+    BRACKET_ORDERS_ENABLED: bool = False    # v3: brackets hurt R:R (cut avg win)
+    BRACKET_TP1_PCT: float = 1.5            # Take-profit 1 percent (50% of position)
+    BRACKET_TP2_PCT: float = 3.0            # Take-profit 2 percent (remaining)
+    BRACKET_TP1_SIZE: float = 0.5           # Fraction of qty for TP1
+    BRACKET_SL_PCT: float = 2.0             # Stop-loss percent
+    BRACKET_MAX_SCALE_INS: int = 2          # Max pyramid add-ons
+    BRACKET_TRAILING_ACTIVATION: float = 1.0  # % gain to activate trailing
+    BRACKET_TRAILING_DISTANCE: float = 0.5  # Trailing stop distance %
+
+    # ── Ultra Bot: Position Sizing (Kelly) ────────────────────────────────────
+    KELLY_SIZING_ENABLED: bool = False      # Use Kelly criterion sizing
+    KELLY_FRACTION: float = 0.5             # Half-Kelly (conservative)
+    MAX_RISK_PER_TRADE: float = 0.02        # 2% of account per trade
+    MAX_PORTFOLIO_HEAT: float = 0.06        # 6% total portfolio risk
+    MAX_POSITION_PCT: float = 0.10          # 10% max single position
+    MAX_SECTOR_CONCENTRATION: float = 0.25  # 25% max in one sector
+    MIN_KELLY_TRADES: int = 20              # Min trades for Kelly
+
+    # ── Ultra Bot: Strategy Selector ──────────────────────────────────────────
+    STRATEGY_SELECTOR_ENABLED: bool = True  # Regime-aware strategy rotation
+    STRATEGY_MAX_CONSECUTIVE_LOSSES: int = 5  # Auto-cooldown after N losses
+    STRATEGY_COOLDOWN_MINUTES: int = 30     # Cooldown duration
+    STRATEGY_MIN_WEIGHT: float = 0.2        # Min regime weight to trade
+
+    # ── Ultra Bot: Trade Journal ──────────────────────────────────────────────
+    TRADE_JOURNAL_ENABLED: bool = True      # Track all trades for analytics
+    TRADE_JOURNAL_DIR: str = "data"         # Directory for journal files
+
+    # ── Ultra Bot: ML Feature Engine ──────────────────────────────────────────
+    ML_FEATURES_ENABLED: bool = False       # Compute ML features per trade
+    ML_WIN_PROB_GATE: float = 0.0           # Min win probability to enter (0=disabled)
+
+    # ── MACD Entry Confirmation ───────────────────────────────────────────────
+    MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
+    MACD_FAST: int = 12
+    MACD_SLOW: int = 26
+    MACD_SIGNAL: int = 9
 
     # ── Notifications ─────────────────────────────────────────────────────────
     TELEGRAM_BOT_TOKEN: str = ""
@@ -174,7 +252,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Ensure strategy name is valid."""
-        allowed = {"momentum", "orb", "vwap_scalp"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback"}
         if v.lower() not in allowed:
             raise ValueError(f"DEFAULT_STRATEGY must be one of {allowed}, got '{v}'")
         return v.lower()
@@ -188,15 +266,31 @@ class Settings(BaseSettings):
             raise ValueError(f"LOG_LEVEL must be one of {allowed}, got '{v}'")
         return v.upper()
 
+    @field_validator("DATA_FEED")
+    @classmethod
+    def validate_data_feed(cls, v: str) -> str:
+        """Ensure data feed is valid."""
+        allowed = {"iex", "sip"}
+        if v.lower() not in allowed:
+            raise ValueError(f"DATA_FEED must be one of {allowed}, got '{v}'")
+        return v.lower()
+
     @model_validator(mode="after")
     def resolve_strategies_list(self) -> "Settings":
         """If STRATEGIES is empty, fall back to [DEFAULT_STRATEGY]."""
         if not self.STRATEGIES:
             self.STRATEGIES = [self.DEFAULT_STRATEGY]
-        allowed = {"momentum", "orb", "vwap_scalp"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback"}
         for s in self.STRATEGIES:
             if s not in allowed:
                 raise ValueError(f"Unknown strategy in STRATEGIES: '{s}'. Allowed: {allowed}")
+        return self
+
+    @model_validator(mode="after")
+    def resolve_ai_advisor(self) -> "Settings":
+        """Auto-enable AI advisor if OPENAI_API_KEY is set."""
+        if self.OPENAI_API_KEY and not self.AI_ADVISOR_ENABLED:
+            self.AI_ADVISOR_ENABLED = True
         return self
 
     @model_validator(mode="after")
