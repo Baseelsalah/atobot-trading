@@ -235,21 +235,14 @@ class AlpacaClient(BaseExchangeClient):
             api_secret = self._settings.ALPACA_API_SECRET
             paper = self._settings.ALPACA_PAPER
 
-            # SDK-native retry for 429/500/502/503 — no need for our own retry on REST
             self._trading_client = TradingClient(
                 api_key=api_key,
                 secret_key=api_secret,
                 paper=paper,
-                retry_attempts=3,
-                retry_wait_seconds=2,
-                retry_exception_codes=[429, 500, 502, 503],
             )
             self._data_client = StockHistoricalDataClient(
                 api_key=api_key,
                 secret_key=api_secret,
-                retry_attempts=3,
-                retry_wait_seconds=2,
-                retry_exception_codes=[429, 500, 502, 503],
             )
 
             # Verify connectivity
