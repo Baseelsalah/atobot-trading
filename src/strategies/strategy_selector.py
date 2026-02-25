@@ -89,6 +89,7 @@ class AdaptiveStrategySelector:
         self._direction_bias: str = "both"  # "long", "short", "both", "none"
         self._risk_on: bool = True
         self._regime_label: str = "unknown"
+        self._volatility_regime: str = "normal"  # from regime detector
 
     # ── Registration ──────────────────────────────────────────────────────────
 
@@ -118,9 +119,10 @@ class AdaptiveStrategySelector:
             self._size_multiplier = regime_detector.get_size_multiplier()
 
             regime = regime_detector.get_current_regime()
-            self._direction_bias = getattr(regime, "direction", "both")
+            self._direction_bias = getattr(regime, "preferred_direction", "both")
             self._risk_on = getattr(regime, "risk_on", True)
             self._regime_label = str(getattr(regime, "trend", "unknown"))
+            self._volatility_regime = str(getattr(regime, "volatility", "normal")).lower()
 
             for name, weight in weights.items():
                 if name in self._strategies:
@@ -164,11 +166,30 @@ class AdaptiveStrategySelector:
         if side.upper() == "SELL" and self._direction_bias == "long":
             return False, f"Regime bias is long-only, blocking SELL"
         if self._direction_bias == "none":
-            return False, "Regime bias is none (choppy), holding off"
+            # Allow mean-reversion strategies (VWAP) in choppy markets —
+            # they're designed for range-bound conditions. Only block
+            # momentum/breakout strategies.
+            mean_reversion = {"vwap_scalp", "vwap"}
+            if strategy_name not in mean_reversion:
+                return False, "Regime bias is none (choppy), holding off"
+            logger.debug(
+                "Regime choppy but allowing mean-reversion strategy {}",
+                strategy_name,
+            )
 
         # Risk-off check
         if not self._risk_on and state.weight < 0.8:
             return False, f"Risk-off regime, low-weight strategy ({state.weight:.2f})"
+
+        # Extreme volatility: block mean-reversion BUY entries (dip-buying
+        # in a crash is suicide — COVID stress test proved this)
+        if self._volatility_regime == "extreme":
+            mean_reversion = {"vwap_scalp", "vwap"}
+            if strategy_name in mean_reversion and side.upper() == "BUY":
+                return False, (
+                    f"Extreme volatility — blocking mean-reversion BUY "
+                    f"for {strategy_name} (shorts/momentum only)"
+                )
 
         return True, ""
 

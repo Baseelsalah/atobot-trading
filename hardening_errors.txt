@@ -1,0 +1,3 @@
+2026-02-25 12:40:49.983 | WARNING  | src.risk.risk_manager:check_circuit_breaker:233 - CIRCUIT BREAKER TRIGGERED — SPY dropped 4.4% (open=450.00, now=430.00). Pausing entries for 30min
+2026-02-25 12:40:49.996 | DEBUG    | src.strategies.strategy_selector:register_strategy:100 - Strategy registered: vwap_scalp
+2026-02-25 12:40:49.997 | DEBUG    | src.strategies.strategy_selector:register_strategy:100 - Strategy registered: orb

@@ -119,6 +119,31 @@ class Settings(BaseSettings):
     # ── Stale Order Cleanup ───────────────────────────────────────────────────
     STALE_ORDER_MAX_AGE_SECONDS: int = 1800  # Cancel limit orders older than 30 min
 
+    # ── Circuit Breaker Detection ─────────────────────────────────────────────
+    CIRCUIT_BREAKER_ENABLED: bool = True  # Pause entries if SPY drops sharply
+    CIRCUIT_BREAKER_SPY_DROP_PCT: float = 4.0  # SPY intraday drop % to trigger
+    CIRCUIT_BREAKER_PAUSE_MINUTES: int = 30  # Minutes to pause after trigger
+
+    # ── Overnight Gap Filter ──────────────────────────────────────────────────
+    GAP_FILTER_ENABLED: bool = True  # Skip first N min if SPY gaps big overnight
+    GAP_FILTER_SPY_THRESHOLD_PCT: float = 2.0  # Abs gap % to trigger filter
+    GAP_FILTER_SKIP_MINUTES: int = 15  # Minutes after open to skip (VWAP needs vol)
+
+    # ── ATR-Adaptive Stop Widening ────────────────────────────────────────────
+    ATR_ADAPTIVE_STOPS: bool = True  # Widen SL when vol is high (ATR > 2x normal)
+    ATR_STOP_MULTIPLIER: float = 1.5  # SL = max(baseline, ATR * this multiplier)
+    ATR_STOP_MAX_WIDENING: float = 3.0  # Max SL widening factor (e.g. 3x baseline)
+    ATR_NORMAL_BASELINE_PCT: float = 0.3  # Normal ATR % (for detecting elevated vol)
+
+    # ── Crisis Position Sizing ────────────────────────────────────────────────
+    CRISIS_SIZING_ENABLED: bool = True  # Reduce size instead of shutting down
+    CRISIS_SIZE_MULTIPLIER: float = 0.5  # Scale to 50% in extreme vol
+
+    # ── Zero Overnight Risk ───────────────────────────────────────────────────
+    FORCE_EOD_FLATTEN: bool = True  # Hard guarantee: no positions held overnight
+    EOD_FLATTEN_FAILSAFE_MINUTES: int = 2  # Failsafe: flatten 2 min before close too
+    EOD_BLOCK_ENTRIES_MINUTES: int = 10  # Block new entries N min before close
+
     # ── ATR-based Position Sizing ─────────────────────────────────────────────
     ATR_SIZING_ENABLED: bool = False  # Use volatility-adjusted order sizes
     ATR_SIZING_PERIOD: int = 14  # ATR look-back period
@@ -226,6 +251,23 @@ class Settings(BaseSettings):
     PAIRS_ORDER_SIZE_USD: float = 5000.0     # Per-leg notional
     PAIRS_MAX_HOLDING_BARS: int = 100        # Max holding period (5min bars)
 
+    # ── Swing Strategy (Small Account Growth) ─────────────────────────────
+    SWING_RSI_OVERSOLD: float = 38.0          # RSI entry threshold
+    SWING_RSI_OVERBOUGHT: float = 70.0        # RSI exit threshold
+    SWING_VOLUME_SURGE: float = 1.3           # Min rel volume for entry
+    SWING_MIN_CONFLUENCE: int = 2             # Min signals needed for entry
+    SWING_TAKE_PROFIT_PCT: float = 3.0        # Base take-profit %
+    SWING_STOP_LOSS_PCT: float = 1.5          # Base stop-loss %
+    SWING_TRAILING_ACTIVATION_PCT: float = 1.5  # Activate trailing at +1.5%
+    SWING_TRAILING_OFFSET_PCT: float = 0.75   # Trail distance from high
+    SWING_MAX_HOLD_DAYS: int = 5              # Max days before time stop
+    SWING_MAX_POSITIONS: int = 3              # Max concurrent swing positions
+    SWING_RISK_PER_TRADE_PCT: float = 3.0     # Risk 3% per trade (aggressive)
+    SWING_ORDER_SIZE_USD: float = 250.0       # Fallback order size for $500 acct
+    SWING_EQUITY_CAP: float = 0.0             # Cap equity for sizing (0 = use real)
+    SWING_MAX_GAP_PCT: float = 5.0            # Max overnight gap % before exit
+    SWING_SYMBOLS: str = "AAPL,MSFT,NVDA,TSLA,AMD,META,GOOGL,AMZN"  # Swing universe
+
     # ── MACD Entry Confirmation ───────────────────────────────────────────────
     MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
     MACD_FAST: int = 12
@@ -305,7 +347,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Ensure strategy name is valid."""
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing"}
         if v.lower() not in allowed:
             raise ValueError(f"DEFAULT_STRATEGY must be one of {allowed}, got '{v}'")
         return v.lower()
@@ -350,7 +392,7 @@ class Settings(BaseSettings):
         """If STRATEGIES is empty, fall back to [DEFAULT_STRATEGY]."""
         if not self.STRATEGIES:
             self.STRATEGIES = [self.DEFAULT_STRATEGY]
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing"}
         for s in self.STRATEGIES:
             if s not in allowed:
                 raise ValueError(f"Unknown strategy in STRATEGIES: '{s}'. Allowed: {allowed}")

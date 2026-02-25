@@ -412,7 +412,7 @@ class MarketRegimeDetector:
         - Strong trend + low vol = full size or 1.25x
         - Choppy = 0.5x
         - High vol = reduce proportionally
-        - Extreme vol = 0.25x or sit out
+        - Extreme vol = crisis sizing (0.25-0.5x) — trade less, not stop
         - Midday chop session = 0.5x
         """
         mult = 1.0
@@ -428,12 +428,12 @@ class MarketRegimeDetector:
         }
         mult *= trend_mult.get(regime.trend, 1.0)
 
-        # Volatility adjustment
+        # Volatility adjustment — crisis sizing: reduce but keep trading
         vol_mult = {
             VolatilityRegime.LOW: 1.1,
             VolatilityRegime.NORMAL: 1.0,
-            VolatilityRegime.ELEVATED: 0.7,
-            VolatilityRegime.EXTREME: 0.25,
+            VolatilityRegime.ELEVATED: 0.6,  # was 0.7 — more cautious
+            VolatilityRegime.EXTREME: 0.35,   # was 0.25 — slightly more room to trade
         }
         mult *= vol_mult.get(regime.volatility, 1.0)
 
@@ -507,8 +507,26 @@ class MarketRegimeDetector:
 
         v4 update: ORB disabled (consistently negative). EMA Pullback added
         as trend-following complement to VWAP mean-reversion.
+
+        v5 (hardened): In extreme volatility, mean-reversion longs are
+        deadly (buying dips in a crash). Favor momentum/ORB shorts.
         """
         weights = {"momentum": 1.0, "vwap_scalp": 1.2, "orb": 0.3, "ema_pullback": 1.0}
+
+        # ── Extreme volatility override (VIX >30 / crisis mode) ──────
+        # COVID stress test showed: VWAP buying dips = death in a crash.
+        # ORB riding momentum = survival. Shift weights accordingly.
+        if regime.volatility == VolatilityRegime.EXTREME:
+            weights["vwap_scalp"] = 0.4   # VWAP mean-reversion is dangerous
+            weights["momentum"] = 1.3     # Big directional moves = edge
+            weights["orb"] = 0.8          # Breakouts work when vol is extreme
+            weights["ema_pullback"] = 0.5 # Pullbacks unreliable in panics
+            # Strong bear + extreme vol = full crisis mode
+            if regime.trend in (TrendRegime.STRONG_BEAR, TrendRegime.BEAR):
+                weights["vwap_scalp"] = 0.2  # Nearly disable dip buying
+                weights["momentum"] = 1.4    # Ride the crash
+                weights["orb"] = 1.0         # Breakdowns work
+            return weights
 
         # Trending market favors momentum + EMA pullback
         if regime.trend in (TrendRegime.STRONG_BULL, TrendRegime.STRONG_BEAR):
@@ -534,10 +552,11 @@ class MarketRegimeDetector:
         elif regime.session == SessionPhase.MIDDAY_CHOP:
             weights["orb"] = 0.1
 
-        # High vol favors momentum (bigger moves)
+        # Elevated vol favors momentum (bigger moves)
         if regime.volatility == VolatilityRegime.ELEVATED:
             weights["momentum"] = min(weights["momentum"] * 1.1, 1.5)
             weights["ema_pullback"] = min(weights["ema_pullback"] * 1.1, 1.5)
+            weights["vwap_scalp"] = weights["vwap_scalp"] * 0.8  # Reduce VWAP in elevated vol
 
         return weights
 

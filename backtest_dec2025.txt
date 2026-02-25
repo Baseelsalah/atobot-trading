@@ -1,0 +1,865 @@
+
+################################################################################
+  AtoBot ULTRA Backtester -- DECEMBER 2025
+################################################################################
+
+  Symbols:   AAPL, MSFT, TSLA, NVDA, AMD
+  Capital:   $100,000
+  Period:    2025-12-01 to 2025-12-31
+
+  Ultra V2 Features (strategy-specific tuning):
+    Momentum:     RSI<=32, TP=2.0%, SL=1.0%, conf>=30, wp>=0.35
+    VWAP:         bounce>=0.10%, TP=0.50%, SL=0.30%, conf>=20, wp>=0.25
+                  No EMA/midday/MACD/brackets (match baseline volume)
+    EMA Pullback: 9/21/50 EMA stack, pullback<=0.20%, RSI 33-58
+                  TP=2.0%, SL=0.85%, brackets 1.2%/3.0%, RSI OB exit
+    ORB:          breakout>=0.15%, TP=1.8%, SL=0.75%, conf>=30, wp>=0.35
+                  No MACD exit (was 82% over-triggering), vol confirm 1.3x
+    Kelly sizing:        50% Kelly (all strategies)
+    Portfolio heat cap:  6%
+    Max consec losses:   5 -> 60 bar cooldown
+
+  Fetching historical data...
+    Fetching AAPL... 13,596 bars
+    Fetching MSFT... 14,470 bars
+    Fetching TSLA... 19,540 bars
+    Fetching NVDA... 19,663 bars
+    Fetching AMD... 15,092 bars
+  Total bars: 82,361  |  Trading days: 26
+
+  > Running BASELINE strategies...
+  > Running IMPROVED strategies...
+  > Running ULTRA strategies...
+
+------------------------------------------------------------
+  INDIVIDUAL STRATEGY REPORTS
+------------------------------------------------------------
+
+============================================================
+  Momentum (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,950.34
+  Net P&L:              $      -49.66  (-0.05%)
+  Max Drawdown:                 1.69%
+  Sharpe (approx):             -0.03
+  Sortino (approx):            -0.07
+
+  Total Round-Trips:       166
+  Wins / Losses:         76 / 90 
+  Win Rate:                     45.8%
+  Avg Win:              $      137.26
+  Avg Loss:             $     -116.46
+  Profit Factor:                1.00
+
+  Exits by reason:
+    Take-Profit:            27
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              59
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            80
+
+  Avg Daily P&L:        $       -1.91
+  Est. Monthly P&L:     $      -40.11
+  Trading Days:             26
+============================================================
+
+============================================================
+  Momentum (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  100,175.29
+  Net P&L:              $      175.29  (+0.18%)
+  Max Drawdown:                 0.39%
+  Sharpe (approx):              1.68
+  Sortino (approx):             3.12
+
+  Total Round-Trips:         9
+  Wins / Losses:          5 / 4  
+  Win Rate:                     55.6%
+  Avg Win:              $      142.52
+  Avg Loss:             $     -134.33
+  Profit Factor:                1.33
+
+  Exits by reason:
+    Take-Profit:             2
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:               3
+    Trailing Stop:           3
+    MACD Death Cross:        0
+    EOD Flatten:             1
+
+  Avg Daily P&L:        $        6.74
+  Est. Monthly P&L:     $      141.58
+  Trading Days:             26
+============================================================
+
+============================================================
+  Momentum (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  100,027.31
+  Net P&L:              $       27.31  (+0.03%)
+  Max Drawdown:                 0.28%
+  Sharpe (approx):              0.56
+  Sortino (approx):             0.78
+
+  Total Round-Trips:         7
+  Wins / Losses:          3 / 4  
+  Win Rate:                     42.9%
+  Avg Win:              $      101.45
+  Avg Loss:             $      -69.26
+  Profit Factor:                1.10
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       1
+    TP2 (full close):        0
+    Stop-Loss:               1
+    Trailing Stop:           1
+    MACD Death Cross:        4
+    EOD Flatten:             0
+
+  Avg Daily P&L:        $        1.05
+  Est. Monthly P&L:     $       22.05
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  106,118.43
+  Net P&L:              $    6,118.43  (+6.12%)
+  Max Drawdown:                 0.92%
+  Sharpe (approx):              1.73
+  Sortino (approx):             3.83
+
+  Total Round-Trips:       784
+  Wins / Losses:        447 / 337
+  Win Rate:                     57.0%
+  Avg Win:              $       60.98
+  Avg Loss:             $      -62.73
+  Profit Factor:                1.29
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             307
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            46
+
+  Avg Daily P&L:        $      235.32
+  Est. Monthly P&L:     $    4,941.81
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  100,340.64
+  Net P&L:              $      340.64  (+0.34%)
+  Max Drawdown:                 0.99%
+  Sharpe (approx):              0.41
+  Sortino (approx):             1.03
+
+  Total Round-Trips:       221
+  Wins / Losses:        120 / 101
+  Win Rate:                     54.3%
+  Avg Win:              $       47.84
+  Avg Loss:             $      -53.47
+  Profit Factor:                1.06
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              86
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            23
+
+  Avg Daily P&L:        $       13.10
+  Est. Monthly P&L:     $      275.13
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  105,783.72
+  Net P&L:              $    5,783.72  (+5.78%)
+  Max Drawdown:                 0.81%
+  Sharpe (approx):              1.79
+  Sortino (approx):             3.44
+
+  Total Round-Trips:       782
+  Wins / Losses:        480 / 302
+  Win Rate:                     61.4%
+  Avg Win:              $       50.72
+  Avg Loss:             $      -61.47
+  Profit Factor:                1.31
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             259
+    Trailing Stop:          44
+    MACD Death Cross:        0
+    EOD Flatten:            47
+
+  Avg Daily P&L:        $      222.45
+  Est. Monthly P&L:     $    4,671.47
+  Trading Days:             26
+============================================================
+
+============================================================
+  EMA Pullback (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,721.96
+  Net P&L:              $     -278.04  (-0.28%)
+  Max Drawdown:                 1.01%
+  Sharpe (approx):             -0.45
+  Sortino (approx):            -0.93
+
+  Total Round-Trips:        72
+  Wins / Losses:         28 / 44 
+  Win Rate:                     38.9%
+  Avg Win:              $      117.87
+  Avg Loss:             $      -81.33
+  Profit Factor:                0.92
+
+  Exits by reason:
+    Take-Profit:             8
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              17
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            47
+
+  Avg Daily P&L:        $      -10.69
+  Est. Monthly P&L:     $     -224.57
+  Trading Days:             26
+============================================================
+
+============================================================
+  EMA Pullback (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,807.67
+  Net P&L:              $     -192.33  (-0.19%)
+  Max Drawdown:                 0.46%
+  Sharpe (approx):             -1.01
+  Sortino (approx):            -1.57
+
+  Total Round-Trips:        29
+  Wins / Losses:         14 / 15 
+  Win Rate:                     48.3%
+  Avg Win:              $       74.55
+  Avg Loss:             $      -82.40
+  Profit Factor:                0.84
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:               6
+    Trailing Stop:           1
+    MACD Death Cross:        0
+    EOD Flatten:            11
+
+  Avg Daily P&L:        $       -7.40
+  Est. Monthly P&L:     $     -155.35
+  Trading Days:             26
+============================================================
+
+============================================================
+  EMA Pullback (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   98,962.58
+  Net P&L:              $   -1,037.42  (-1.04%)
+  Max Drawdown:                 1.43%
+  Sharpe (approx):             -1.93
+  Sortino (approx):            -2.69
+
+  Total Round-Trips:        97
+  Wins / Losses:         43 / 54 
+  Win Rate:                     44.3%
+  Avg Win:              $       62.49
+  Avg Loss:             $      -68.97
+  Profit Factor:                0.72
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       3
+    TP2 (full close):        0
+    Stop-Loss:              17
+    Trailing Stop:           5
+    MACD Death Cross:        0
+    EOD Flatten:            38
+
+  Avg Daily P&L:        $      -39.90
+  Est. Monthly P&L:     $     -837.91
+  Trading Days:             26
+============================================================
+
+============================================================
+  ORB (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   96,888.68
+  Net P&L:              $   -3,111.32  (-3.11%)
+  Max Drawdown:                 3.75%
+  Sharpe (approx):             -1.07
+  Sortino (approx):            -5.13
+
+  Total Round-Trips:       341
+  Wins / Losses:        116 / 225
+  Win Rate:                     34.0%
+  Avg Win:              $      162.53
+  Avg Loss:             $      -97.62
+  Profit Factor:                0.86
+
+  Exits by reason:
+    Take-Profit:            75
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             208
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            58
+
+  Avg Daily P&L:        $     -119.67
+  Est. Monthly P&L:     $   -2,512.99
+  Trading Days:             26
+============================================================
+
+============================================================
+  ORB (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,106.83
+  Net P&L:              $     -893.17  (-0.89%)
+  Max Drawdown:                 2.19%
+  Sharpe (approx):             -0.31
+  Sortino (approx):            -1.08
+
+  Total Round-Trips:       439
+  Wins / Losses:        207 / 232
+  Win Rate:                     47.2%
+  Avg Win:              $       93.40
+  Avg Loss:             $      -87.19
+  Profit Factor:                0.96
+
+  Exits by reason:
+    Take-Profit:            40
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             194
+    Trailing Stop:         147
+    MACD Death Cross:        0
+    EOD Flatten:            58
+
+  Avg Daily P&L:        $      -34.35
+  Est. Monthly P&L:     $     -721.40
+  Trading Days:             26
+============================================================
+
+============================================================
+  ORB (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   98,460.38
+  Net P&L:              $   -1,539.62  (-1.54%)
+  Max Drawdown:                 2.02%
+  Sharpe (approx):             -0.78
+  Sortino (approx):            -1.77
+
+  Total Round-Trips:       284
+  Wins / Losses:        146 / 138
+  Win Rate:                     51.4%
+  Avg Win:              $       86.00
+  Avg Loss:             $     -102.14
+  Profit Factor:                0.89
+
+  Exits by reason:
+    Take-Profit:            16
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              96
+    Trailing Stop:         112
+    MACD Death Cross:        0
+    EOD Flatten:            60
+
+  Avg Daily P&L:        $      -59.22
+  Est. Monthly P&L:     $   -1,243.54
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+EMA (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  105,840.40
+  Net P&L:              $    5,840.40  (+5.84%)
+  Max Drawdown:                 1.01%
+  Sharpe (approx):              1.37
+  Sortino (approx):             2.85
+
+  Total Round-Trips:       856
+  Wins / Losses:        475 / 381
+  Win Rate:                     55.5%
+  Avg Win:              $       64.34
+  Avg Loss:             $      -64.88
+  Profit Factor:                1.24
+
+  Exits by reason:
+    Take-Profit:             8
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             324
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:            93
+
+  Avg Daily P&L:        $      224.63
+  Est. Monthly P&L:     $    4,717.24
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+EMA (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  100,148.31
+  Net P&L:              $      148.31  (+0.15%)
+  Max Drawdown:                 0.99%
+  Sharpe (approx):              0.14
+  Sortino (approx):             0.28
+
+  Total Round-Trips:       250
+  Wins / Losses:        134 / 116
+  Win Rate:                     53.6%
+  Avg Win:              $       50.63
+  Avg Loss:             $      -57.21
+  Profit Factor:                1.02
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              92
+    Trailing Stop:           1
+    MACD Death Cross:        0
+    EOD Flatten:            34
+
+  Avg Daily P&L:        $        5.70
+  Est. Monthly P&L:     $      119.79
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+EMA (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  104,746.31
+  Net P&L:              $    4,746.31  (+4.75%)
+  Max Drawdown:                 1.43%
+  Sharpe (approx):              1.25
+  Sortino (approx):             2.15
+
+  Total Round-Trips:       879
+  Wins / Losses:        523 / 356
+  Win Rate:                     59.5%
+  Avg Win:              $       51.69
+  Avg Loss:             $      -62.61
+  Profit Factor:                1.21
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       3
+    TP2 (full close):        0
+    Stop-Loss:             276
+    Trailing Stop:          49
+    MACD Death Cross:        0
+    EOD Flatten:            85
+
+  Avg Daily P&L:        $      182.55
+  Est. Monthly P&L:     $    3,833.55
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+ORB (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  103,007.11
+  Net P&L:              $    3,007.11  (+3.01%)
+  Max Drawdown:                 3.75%
+  Sharpe (approx):              0.44
+  Sortino (approx):             1.21
+
+  Total Round-Trips:      1125
+  Wins / Losses:        563 / 562
+  Win Rate:                     50.0%
+  Avg Win:              $       81.91
+  Avg Loss:             $      -76.70
+  Profit Factor:                1.07
+
+  Exits by reason:
+    Take-Profit:            75
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             515
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:           104
+
+  Avg Daily P&L:        $      115.66
+  Est. Monthly P&L:     $    2,428.82
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+ORB (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,447.47
+  Net P&L:              $     -552.53  (-0.55%)
+  Max Drawdown:                 2.19%
+  Sharpe (approx):             -0.14
+  Sortino (approx):            -0.41
+
+  Total Round-Trips:       660
+  Wins / Losses:        327 / 333
+  Win Rate:                     49.5%
+  Avg Win:              $       76.68
+  Avg Loss:             $      -76.96
+  Profit Factor:                0.98
+
+  Exits by reason:
+    Take-Profit:            40
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             280
+    Trailing Stop:         147
+    MACD Death Cross:        0
+    EOD Flatten:            81
+
+  Avg Daily P&L:        $      -21.25
+  Est. Monthly P&L:     $     -446.27
+  Trading Days:             26
+============================================================
+
+============================================================
+  VWAP+ORB (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  104,244.10
+  Net P&L:              $    4,244.10  (+4.24%)
+  Max Drawdown:                 2.02%
+  Sharpe (approx):              0.79
+  Sortino (approx):             1.45
+
+  Total Round-Trips:      1066
+  Wins / Losses:        626 / 440
+  Win Rate:                     58.7%
+  Avg Win:              $       58.95
+  Avg Loss:             $      -74.23
+  Profit Factor:                1.13
+
+  Exits by reason:
+    Take-Profit:            16
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             355
+    Trailing Stop:         156
+    MACD Death Cross:        0
+    EOD Flatten:           107
+
+  Avg Daily P&L:        $      163.23
+  Est. Monthly P&L:     $    3,427.93
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 3 Core (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  105,790.73
+  Net P&L:              $    5,790.73  (+5.79%)
+  Max Drawdown:                 1.69%
+  Sharpe (approx):              0.94
+  Sortino (approx):             1.84
+
+  Total Round-Trips:      1022
+  Wins / Losses:        551 / 471
+  Win Rate:                     53.9%
+  Avg Win:              $       74.39
+  Avg Loss:             $      -74.73
+  Profit Factor:                1.16
+
+  Exits by reason:
+    Take-Profit:            35
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             383
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:           173
+
+  Avg Daily P&L:        $      222.72
+  Est. Monthly P&L:     $    4,677.13
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 3 Core (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  100,323.59
+  Net P&L:              $      323.59  (+0.32%)
+  Max Drawdown:                 0.99%
+  Sharpe (approx):              0.27
+  Sortino (approx):             0.51
+
+  Total Round-Trips:       259
+  Wins / Losses:        139 / 120
+  Win Rate:                     53.7%
+  Avg Win:              $       53.94
+  Avg Loss:             $      -59.78
+  Profit Factor:                1.05
+
+  Exits by reason:
+    Take-Profit:             2
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:              95
+    Trailing Stop:           4
+    MACD Death Cross:        0
+    EOD Flatten:            35
+
+  Avg Daily P&L:        $       12.45
+  Est. Monthly P&L:     $      261.36
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 3 Core (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  104,773.61
+  Net P&L:              $    4,773.61  (+4.77%)
+  Max Drawdown:                 1.43%
+  Sharpe (approx):              1.24
+  Sortino (approx):             2.12
+
+  Total Round-Trips:       886
+  Wins / Losses:        526 / 360
+  Win Rate:                     59.4%
+  Avg Win:              $       51.98
+  Avg Loss:             $      -62.68
+  Profit Factor:                1.21
+
+  Exits by reason:
+    Take-Profit:             0
+    TP1 (partial 50%):       4
+    TP2 (full close):        0
+    Stop-Loss:             277
+    Trailing Stop:          50
+    MACD Death Cross:        4
+    EOD Flatten:            85
+
+  Avg Daily P&L:        $      183.60
+  Est. Monthly P&L:     $    3,855.61
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 4 (baseline)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  102,679.42
+  Net P&L:              $    2,679.42  (+2.68%)
+  Max Drawdown:                 3.75%
+  Sharpe (approx):              0.29
+  Sortino (approx):             0.70
+
+  Total Round-Trips:      1363
+  Wins / Losses:        667 / 696
+  Win Rate:                     48.9%
+  Avg Win:              $       89.72
+  Avg Loss:             $      -82.13
+  Profit Factor:                1.05
+
+  Exits by reason:
+    Take-Profit:           110
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             591
+    Trailing Stop:           0
+    MACD Death Cross:        0
+    EOD Flatten:           231
+
+  Avg Daily P&L:        $      103.05
+  Est. Monthly P&L:     $    2,164.14
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 4 (improved)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $   99,430.42
+  Net P&L:              $     -569.58  (-0.57%)
+  Max Drawdown:                 2.19%
+  Sharpe (approx):             -0.14
+  Sortino (approx):            -0.36
+
+  Total Round-Trips:       698
+  Wins / Losses:        346 / 352
+  Win Rate:                     49.6%
+  Avg Win:              $       77.55
+  Avg Loss:             $      -77.84
+  Profit Factor:                0.98
+
+  Exits by reason:
+    Take-Profit:            42
+    TP1 (partial 50%):       0
+    TP2 (full close):        0
+    Stop-Loss:             289
+    Trailing Stop:         151
+    MACD Death Cross:        0
+    EOD Flatten:            93
+
+  Avg Daily P&L:        $      -21.91
+  Est. Monthly P&L:     $     -460.04
+  Trading Days:             26
+============================================================
+
+============================================================
+  ALL 4 (ULTRA)
+============================================================
+  Starting Capital:     $  100,000.00
+  Final Equity:         $  103,233.99
+  Net P&L:              $    3,233.99  (+3.23%)
+  Max Drawdown:                 2.02%
+  Sharpe (approx):              0.54
+  Sortino (approx):             0.95
+
+  Total Round-Trips:      1170
+  Wins / Losses:        672 / 498
+  Win Rate:                     57.4%
+  Avg Win:              $       59.37
+  Avg Loss:             $      -73.62
+  Profit Factor:                1.09
+
+  Exits by reason:
+    Take-Profit:            16
+    TP1 (partial 50%):       4
+    TP2 (full close):        0
+    Stop-Loss:             373
+    Trailing Stop:         162
+    MACD Death Cross:        4
+    EOD Flatten:           145
+
+  Avg Daily P&L:        $      124.38
+  Est. Monthly P&L:     $    2,612.07
+  Trading Days:             26
+============================================================
+
+
+====================================================================================================
+  BASELINE vs IMPROVED vs ULTRA -- DECEMBER 2025
+====================================================================================================
+  Strategy                          Net P&L   Win Rate   Trades   Max DD   Sharpe    Mo. P&L
+  ---------------------------- ------------ ---------- -------- -------- -------- ----------
+  Momentum (baseline)           $    -49.66      45.8%      166    1.69%    -0.03  $     -40
+  Momentum (improved)           $   +175.29      55.6%        9    0.39%     1.68  $    +142
+  Momentum (ULTRA)              $    +27.31      42.9%        7    0.28%     0.56  $     +22
+  VWAP (baseline)               $ +6,118.43      57.0%      784    0.92%     1.73  $  +4,942
+  VWAP (improved)               $   +340.64      54.3%      221    0.99%     0.41  $    +275
+  VWAP (ULTRA)                  $ +5,783.72      61.4%      782    0.81%     1.79  $  +4,671
+  EMA Pullback (baseline)       $   -278.04      38.9%       72    1.01%    -0.45  $    -225
+  EMA Pullback (improved)       $   -192.33      48.3%       29    0.46%    -1.01  $    -155
+  EMA Pullback (ULTRA)          $ -1,037.42      44.3%       97    1.43%    -1.93  $    -838
+  ORB (baseline)                $ -3,111.32      34.0%      341    3.75%    -1.07  $  -2,513
+  ORB (improved)                $   -893.17      47.2%      439    2.19%    -0.31  $    -721
+  ORB (ULTRA)                   $ -1,539.62      51.4%      284    2.02%    -0.78  $  -1,244
+  VWAP+EMA (baseline)           $ +5,840.40      55.5%      856    1.01%     1.37  $  +4,717
+  VWAP+EMA (improved)           $   +148.31      53.6%      250    0.99%     0.14  $    +120
+  VWAP+EMA (ULTRA)              $ +4,746.31      59.5%      879    1.43%     1.25  $  +3,834
+  VWAP+ORB (baseline)           $ +3,007.11      50.0%     1125    3.75%     0.44  $  +2,429
+  VWAP+ORB (improved)           $   -552.53      49.5%      660    2.19%    -0.14  $    -446
+  VWAP+ORB (ULTRA)              $ +4,244.10      58.7%     1066    2.02%     0.79  $  +3,428
+  ALL 3 Core (baseline)         $ +5,790.73      53.9%     1022    1.69%     0.94  $  +4,677
+  ALL 3 Core (improved)         $   +323.59      53.7%      259    0.99%     0.27  $    +261
+  ALL 3 Core (ULTRA)            $ +4,773.61      59.4%      886    1.43%     1.24  $  +3,856
+  ALL 4 (baseline)              $ +2,679.42      48.9%     1363    3.75%     0.29  $  +2,164
+  ALL 4 (improved)              $   -569.58      49.6%      698    2.19%    -0.14  $    -460
+  ALL 4 (ULTRA)                 $ +3,233.99      57.4%     1170    2.02%     0.54  $  +2,612
+====================================================================================================
+
+  BEST NET P&L:    VWAP (baseline) -> $+6,118.43
+  BEST WIN RATE:   VWAP (ULTRA) -> 61.4%
+  LOWEST DRAWDOWN: Momentum (ULTRA) -> 0.28%
+
+
+--------------------------------------------------------------------------------
+  ULTRA ANALYTICS -- DECEMBER 2025
+--------------------------------------------------------------------------------
+
+  Momentum (ULTRA):
+    Entries:              6  (Ultra-gated: 6)
+    Bracket TP1 (50%):    1  (14.3% of exits)
+    Bracket TP2 (full):   0  (0.0% of exits)
+    MACD Death Cross:     4  (57.1% of exits)
+    Trailing Stop:        1  (14.3% of exits)
+    Stop Loss:            1  (14.3% of exits)
+    EOD Flatten:          0  (0.0% of exits)
+
+  VWAP (ULTRA):
+    Entries:            782  (Ultra-gated: 782)
+    Bracket TP1 (50%):    0  (0.0% of exits)
+    Bracket TP2 (full):   0  (0.0% of exits)
+    MACD Death Cross:     0  (0.0% of exits)
+    Trailing Stop:       44  (5.6% of exits)
+    Stop Loss:          259  (33.1% of exits)
+    EOD Flatten:         47  (6.0% of exits)
+
+  EMA Pullback (ULTRA):
+    Entries:             94  (Ultra-gated: 94)
+    Bracket TP1 (50%):    3  (3.1% of exits)
+    Bracket TP2 (full):   0  (0.0% of exits)
+    MACD Death Cross:     0  (0.0% of exits)
+    Trailing Stop:        5  (5.2% of exits)
+    Stop Loss:           17  (17.5% of exits)
+    EOD Flatten:         38  (39.2% of exits)
+
+  ORB (ULTRA):
+    Entries:            284  (Ultra-gated: 284)
+    Bracket TP1 (50%):    0  (0.0% of exits)
+    Bracket TP2 (full):   0  (0.0% of exits)
+    MACD Death Cross:     0  (0.0% of exits)
+    Trailing Stop:      112  (39.4% of exits)
+    Stop Loss:           96  (33.8% of exits)
+    EOD Flatten:         60  (21.1% of exits)
+--------------------------------------------------------------------------------
+
+  >>> OVERALL BEST: VWAP (baseline)
+    Net P&L: $+6,118.43  |  Win Rate: 57.0%  |  Max DD: 0.92%  |  Est Monthly: $+4,942/mo
+
+  >>> RECOMMENDED (VWAP+EMA ULTRA): $+4,746.31  |  Est Monthly: $+3,834/mo
+  >>> ALL 3 Core ULTRA:             $+4,773.61  |  Est Monthly: $+3,856/mo
+

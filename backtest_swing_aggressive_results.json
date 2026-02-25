@@ -1,0 +1,2669 @@
+{
+  "starting_capital": 500.0,
+  "monthly_deposit": 400.0,
+  "total_deposited": 2900.0,
+  "final_equity": 3540.9100684090195,
+  "trading_pnl": 638.3293684090186,
+  "return_on_deposits_pct": 22.10034718651791,
+  "max_drawdown_pct": 8.23458596529609,
+  "total_trades": 165,
+  "win_rate": 67.87878787878789,
+  "avg_win": 14.680660964962538,
+  "avg_loss": -18.979333201260104,
+  "profit_factor": 1.6345823754514377,
+  "avg_hold_days": 2.56969696969697,
+  "monthly_trading_pnl": 106.38822806816977,
+  "daily_equity": [
+    {
+      "date": "2025-08-21",
+      "equity": 500.0
+    },
+    {
+      "date": "2025-08-22",
+      "equity": 503.16755718999997
+    },
+    {
+      "date": "2025-08-25",
+      "equity": 500.74043470749996
+    },
+    {
+      "date": "2025-08-26",
+      "equity": 498.6491947075
+    },
+    {
+      "date": "2025-08-27",
+      "equity": 495.19930270749995
+    },
+    {
+      "date": "2025-08-28",
+      "equity": 493.1416257075
+    },
+    {
+      "date": "2025-08-29",
+      "equity": 479.88678290749993
+    },
+    {
+      "date": "2025-09-02",
+      "equity": 876.5922993799999
+    },
+    {
+      "date": "2025-09-03",
+      "equity": 895.1073192674999
+    },
+    {
+      "date": "2025-09-04",
+      "equity": 900.0171072674998
+    },
+    {
+      "date": "2025-09-05",
+      "equity": 897.8907702096427
+    },
+    {
+      "date": "2025-09-08",
+      "equity": 892.4270578796428
+    },
+    {
+      "date": "2025-09-09",
+      "equity": 892.8032308796429
+    },
+    {
+      "date": "2025-09-10",
+      "equity": 896.3141788796429
+    },
+    {
+      "date": "2025-09-11",
+      "equity": 897.4606108796429
+    },
+    {
+      "date": "2025-09-12",
+      "equity": 911.2462317671428
+    },
+    {
+      "date": "2025-09-15",
+      "equity": 920.0058074221429
+    },
+    {
+      "date": "2025-09-16",
+      "equity": 910.3582912971428
+    },
+    {
+      "date": "2025-09-17",
+      "equity": 910.9680419407142
+    },
+    {
+      "date": "2025-09-18",
+      "equity": 908.2310299407142
+    },
+    {
+      "date": "2025-09-19",
+      "equity": 924.8356943907141
+    },
+    {
+      "date": "2025-09-22",
+      "equity": 922.3866597407141
+    },
+    {
+      "date": "2025-09-23",
+      "equity": 915.0936479482142
+    },
+    {
+      "date": "2025-09-24",
+      "equity": 907.2064619632143
+    },
+    {
+      "date": "2025-09-25",
+      "equity": 923.0344861832143
+    },
+    {
+      "date": "2025-09-26",
+      "equity": 917.6838801832143
+    },
+    {
+      "date": "2025-09-29",
+      "equity": 915.6357028082143
+    },
+    {
+      "date": "2025-09-30",
+      "equity": 921.4500792332144
+    },
+    {
+      "date": "2025-10-01",
+      "equity": 1331.7357122082142
+    },
+    {
+      "date": "2025-10-02",
+      "equity": 1308.3416535282142
+    },
+    {
+      "date": "2025-10-03",
+      "equity": 1312.869645528214
+    },
+    {
+      "date": "2025-10-06",
+      "equity": 1306.1048043407145
+    },
+    {
+      "date": "2025-10-07",
+      "equity": 1305.0364925457145
+    },
+    {
+      "date": "2025-10-08",
+      "equity": 1388.6705410932145
+    },
+    {
+      "date": "2025-10-09",
+      "equity": 1369.7444412932148
+    },
+    {
+      "date": "2025-10-10",
+      "equity": 1353.4641267032148
+    },
+    {
+      "date": "2025-10-13",
+      "equity": 1379.4608529132151
+    },
+    {
+      "date": "2025-10-14",
+      "equity": 1379.838300913215
+    },
+    {
+      "date": "2025-10-15",
+      "equity": 1391.2492426414292
+    },
+    {
+      "date": "2025-10-16",
+      "equity": 1370.8414686414294
+    },
+    {
+      "date": "2025-10-17",
+      "equity": 1388.4563436414296
+    },
+    {
+      "date": "2025-10-20",
+      "equity": 1418.1157704314296
+    },
+    {
+      "date": "2025-10-21",
+      "equity": 1420.9403534350006
+    },
+    {
+      "date": "2025-10-22",
+      "equity": 1398.0668505850008
+    },
+    {
+      "date": "2025-10-23",
+      "equity": 1404.0895245850008
+    },
+    {
+      "date": "2025-10-24",
+      "equity": 1420.7635648000007
+    },
+    {
+      "date": "2025-10-27",
+      "equity": 1444.597570580001
+    },
+    {
+      "date": "2025-10-28",
+      "equity": 1446.407804975001
+    },
+    {
+      "date": "2025-10-29",
+      "equity": 1451.0724300470008
+    },
+    {
+      "date": "2025-10-30",
+      "equity": 1461.2809490613263
+    },
+    {
+      "date": "2025-10-31",
+      "equity": 1481.9568154813264
+    },
+    {
+      "date": "2025-11-03",
+      "equity": 1908.6508076013263
+    },
+    {
+      "date": "2025-11-04",
+      "equity": 1917.9526956013267
+    },
+    {
+      "date": "2025-11-05",
+      "equity": 1966.0019945215518
+    },
+    {
+      "date": "2025-11-06",
+      "equity": 1885.6426991715516
+    },
+    {
+      "date": "2025-11-07",
+      "equity": 1816.9511726108376
+    },
+    {
+      "date": "2025-11-10",
+      "equity": 1847.3051455483378
+    },
+    {
+      "date": "2025-11-11",
+      "equity": 1877.5454675508379
+    },
+    {
+      "date": "2025-11-12",
+      "equity": 1864.180795550838
+    },
+    {
+      "date": "2025-11-13",
+      "equity": 1858.1808864008378
+    },
+    {
+      "date": "2025-11-14",
+      "equity": 1856.234286900838
+    },
+    {
+      "date": "2025-11-17",
+      "equity": 1824.1373455822666
+    },
+    {
+      "date": "2025-11-18",
+      "equity": 1823.2637510072668
+    },
+    {
+      "date": "2025-11-19",
+      "equity": 1849.9791500447668
+    },
+    {
+      "date": "2025-11-20",
+      "equity": 1885.2572886447667
+    },
+    {
+      "date": "2025-11-21",
+      "equity": 1942.593411259767
+    },
+    {
+      "date": "2025-11-24",
+      "equity": 1974.4548452697668
+    },
+    {
+      "date": "2025-11-25",
+      "equity": 1989.9288088997664
+    },
+    {
+      "date": "2025-11-26",
+      "equity": 2019.306974222267
+    },
+    {
+      "date": "2025-11-28",
+      "equity": 2037.4571935535173
+    },
+    {
+      "date": "2025-12-01",
+      "equity": 2440.324517173667
+    },
+    {
+      "date": "2025-12-02",
+      "equity": 2463.250636108667
+    },
+    {
+      "date": "2025-12-03",
+      "equity": 2445.694192108667
+    },
+    {
+      "date": "2025-12-04",
+      "equity": 2416.0058352736673
+    },
+    {
+      "date": "2025-12-05",
+      "equity": 2399.4835471486667
+    },
+    {
+      "date": "2025-12-08",
+      "equity": 2389.360002315453
+    },
+    {
+      "date": "2025-12-09",
+      "equity": 2395.6889263454536
+    },
+    {
+      "date": "2025-12-10",
+      "equity": 2337.326962345454
+    },
+    {
+      "date": "2025-12-11",
+      "equity": 2357.978022445454
+    },
+    {
+      "date": "2025-12-12",
+      "equity": 2335.8140653954533
+    },
+    {
+      "date": "2025-12-15",
+      "equity": 2316.267006902596
+    },
+    {
+      "date": "2025-12-16",
+      "equity": 2354.248903152596
+    },
+    {
+      "date": "2025-12-17",
+      "equity": 2260.412144937596
+    },
+    {
+      "date": "2025-12-18",
+      "equity": 2330.960710894546
+    },
+    {
+      "date": "2025-12-19",
+      "equity": 2345.7123981445466
+    },
+    {
+      "date": "2025-12-22",
+      "equity": 2322.5698881445464
+    },
+    {
+      "date": "2025-12-23",
+      "equity": 2334.4839951445465
+    },
+    {
+      "date": "2025-12-24",
+      "equity": 2346.912380144546
+    },
+    {
+      "date": "2025-12-26",
+      "equity": 2343.398147144546
+    },
+    {
+      "date": "2025-12-29",
+      "equity": 2346.483815144546
+    },
+    {
+      "date": "2025-12-30",
+      "equity": 2340.655331144546
+    },
+    {
+      "date": "2025-12-31",
+      "equity": 2330.1983451445462
+    },
+    {
+      "date": "2026-01-02",
+      "equity": 2722.912740144546
+    },
+    {
+      "date": "2026-01-05",
+      "equity": 2710.991596787332
+    },
+    {
+      "date": "2026-01-06",
+      "equity": 2802.6690319773315
+    },
+    {
+      "date": "2026-01-07",
+      "equity": 2867.926160917332
+    },
+    {
+      "date": "2026-01-08",
+      "equity": 2835.2727204458315
+    },
+    {
+      "date": "2026-01-09",
+      "equity": 2849.827114433332
+    },
+    {
+      "date": "2026-01-12",
+      "equity": 2859.9087317083317
+    },
+    {
+      "date": "2026-01-13",
+      "equity": 2879.288006232232
+    },
+    {
+      "date": "2026-01-14",
+      "equity": 2859.360713232232
+    },
+    {
+      "date": "2026-01-15",
+      "equity": 2846.6069222822316
+    },
+    {
+      "date": "2026-01-16",
+      "equity": 2820.616751080089
+    },
+    {
+      "date": "2026-01-20",
+      "equity": 2778.426124440446
+    },
+    {
+      "date": "2026-01-21",
+      "equity": 2790.181316233304
+    },
+    {
+      "date": "2026-01-22",
+      "equity": 2813.0078382183037
+    },
+    {
+      "date": "2026-01-23",
+      "equity": 2848.876241118304
+    },
+    {
+      "date": "2026-01-26",
+      "equity": 2873.855798630804
+    },
+    {
+      "date": "2026-01-27",
+      "equity": 2873.1977696308045
+    },
+    {
+      "date": "2026-01-28",
+      "equity": 2875.7332426308044
+    },
+    {
+      "date": "2026-01-29",
+      "equity": 2893.029695748304
+    },
+    {
+      "date": "2026-01-30",
+      "equity": 2893.2037537758047
+    },
+    {
+      "date": "2026-02-02",
+      "equity": 3378.3708801308053
+    },
+    {
+      "date": "2026-02-03",
+      "equity": 3352.85925653152
+    },
+    {
+      "date": "2026-02-04",
+      "equity": 3409.3267039815196
+    },
+    {
+      "date": "2026-02-05",
+      "equity": 3414.7430782440197
+    },
+    {
+      "date": "2026-02-06",
+      "equity": 3448.7110967715194
+    },
+    {
+      "date": "2026-02-09",
+      "equity": 3550.77774012152
+    },
+    {
+      "date": "2026-02-10",
+      "equity": 3601.3576784215197
+    },
+    {
+      "date": "2026-02-11",
+      "equity": 3594.81783042152
+    },
+    {
+      "date": "2026-02-12",
+      "equity": 3533.9940224215193
+    },
+    {
+      "date": "2026-02-13",
+      "equity": 3493.3181008215197
+    },
+    {
+      "date": "2026-02-17",
+      "equity": 3493.3181008215197
+    },
+    {
+      "date": "2026-02-18",
+      "equity": 3538.3293684090195
+    },
+    {
+      "date": "2026-02-19",
+      "equity": 3540.3423144090198
+    },
+    {
+      "date": "2026-02-20",
+      "equity": 3540.9100684090195
+    }
+  ],
+  "trades": [
+    {
+      "symbol": "NVDA",
+      "entry_price": 174.98,
+      "exit_price": 177.25057500000003,
+      "shares": 0.1358,
+      "pnl": 0.30834408500000493,
+      "pnl_pct": 1.2976197279689314,
+      "entry_date": "2025-08-21",
+      "exit_date": "2025-08-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 500.0
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 199.75,
+      "exit_price": 206.97595,
+      "shares": 0.0059,
+      "pnl": 0.04263310500000007,
+      "pnl_pct": 3.617496871088867,
+      "entry_date": "2025-08-21",
+      "exit_date": "2025-08-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 500.0
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 177.99,
+      "exit_price": 180.54567500000002,
+      "shares": 0.1353,
+      "pnl": 0.34578282750000106,
+      "pnl_pct": 1.4358531378167354,
+      "entry_date": "2025-08-22",
+      "exit_date": "2025-08-25",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 503.16755718999997
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 340.01,
+      "exit_price": 346.908525,
+      "shares": 0.0036,
+      "pnl": 0.024834690000000024,
+      "pnl_pct": 2.028918267109793,
+      "entry_date": "2025-08-22",
+      "exit_date": "2025-08-25",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 503.16755718999997
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 504.24,
+      "exit_price": 502.04,
+      "shares": 0.942,
+      "pnl": -2.0723999999999894,
+      "pnl_pct": -0.43630017452006753,
+      "entry_date": "2025-08-21",
+      "exit_date": "2025-08-26",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 500.0
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 351.67,
+      "exit_price": 334.0865,
+      "shares": 0.8508,
+      "pnl": -14.960041800000013,
+      "pnl_pct": -5.0000000000000036,
+      "entry_date": "2025-08-26",
+      "exit_date": "2025-08-29",
+      "days_held": 3,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 498.6491947075
+    },
+    {
+      "symbol": "META",
+      "entry_price": 754.1,
+      "exit_price": 729.3206107142857,
+      "shares": 0.2513,
+      "pnl": -6.227060527499997,
+      "pnl_pct": -3.28595534885483,
+      "entry_date": "2025-08-26",
+      "exit_date": "2025-09-02",
+      "days_held": 7,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 498.6491947075
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 230.49,
+      "exit_price": 229.72,
+      "shares": 0.041,
+      "pnl": -0.031570000000000424,
+      "pnl_pct": -0.33407089244653143,
+      "entry_date": "2025-08-27",
+      "exit_date": "2025-09-02",
+      "days_held": 6,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 495.19930270749995
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 506.69,
+      "exit_price": 505.35,
+      "shares": 0.5339,
+      "pnl": -0.7154259999999867,
+      "pnl_pct": -0.2644615050622619,
+      "entry_date": "2025-08-29",
+      "exit_date": "2025-09-03",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 479.8867829075
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 229.72,
+      "exit_price": 237.058625,
+      "shares": 2.5099,
+      "pnl": 18.41921488750002,
+      "pnl_pct": 3.194595594636953,
+      "entry_date": "2025-09-02",
+      "exit_date": "2025-09-03",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 876.5922993799999
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 505.35,
+      "exit_price": 495.2800607142857,
+      "shares": 0.0814,
+      "pnl": -0.8196930578571462,
+      "pnl_pct": -1.9926663274392649,
+      "entry_date": "2025-09-03",
+      "exit_date": "2025-09-05",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 895.1073192674999
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 170.78,
+      "exit_price": 168.31,
+      "shares": 0.1687,
+      "pnl": -0.41668899999999975,
+      "pnl_pct": -1.4463051879611188,
+      "entry_date": "2025-09-02",
+      "exit_date": "2025-09-08",
+      "days_held": 6,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 876.5922993799999
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 238.47,
+      "exit_price": 237.88,
+      "shares": 3.4512,
+      "pnl": -2.036208000000012,
+      "pnl_pct": -0.24741057575376502,
+      "entry_date": "2025-09-03",
+      "exit_date": "2025-09-08",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 895.1073192674999
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 350.84,
+      "exit_price": 355.7517,
+      "shares": 0.1151,
+      "pnl": 0.5653366700000061,
+      "pnl_pct": 1.399982898187223,
+      "entry_date": "2025-09-05",
+      "exit_date": "2025-09-08",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 897.8907702096427
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 498.2,
+      "exit_price": 508.705875,
+      "shares": 1.7913,
+      "pnl": 18.819173887500003,
+      "pnl_pct": 2.1087665596146135,
+      "entry_date": "2025-09-08",
+      "exit_date": "2025-09-12",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 892.4270578796428
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 234.07,
+      "exit_price": 236.40357500000002,
+      "shares": 3.6984,
+      "pnl": 8.63049378000009,
+      "pnl_pct": 0.9969560387918248,
+      "entry_date": "2025-09-12",
+      "exit_date": "2025-09-15",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 911.2462317671428
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 395.94,
+      "exit_price": 422.50725,
+      "shares": 0.0055,
+      "pnl": 0.146119875,
+      "pnl_pct": 6.70991816941961,
+      "entry_date": "2025-09-12",
+      "exit_date": "2025-09-15",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 911.2462317671428
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 410.04,
+      "exit_price": 422.50725,
+      "shares": 0.1015,
+      "pnl": 1.2654258749999978,
+      "pnl_pct": 3.0404960491659296,
+      "entry_date": "2025-09-15",
+      "exit_date": "2025-09-16",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 920.0058074221429
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 177.82,
+      "exit_price": 170.25733214285714,
+      "shares": 0.2434,
+      "pnl": -1.8407533564285712,
+      "pnl_pct": -4.2529905843790665,
+      "entry_date": "2025-09-12",
+      "exit_date": "2025-09-17",
+      "days_held": 5,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 911.2462317671428
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 238.15,
+      "exit_price": 244.45275000000004,
+      "shares": 0.1798,
+      "pnl": 1.1332344500000056,
+      "pnl_pct": 2.646546294352312,
+      "entry_date": "2025-09-16",
+      "exit_date": "2025-09-19",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 910.3582912971428
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 515.36,
+      "exit_price": 514.45,
+      "shares": 1.6162,
+      "pnl": -1.4707419999999487,
+      "pnl_pct": -0.17657559764047817,
+      "entry_date": "2025-09-15",
+      "exit_date": "2025-09-22",
+      "days_held": 7,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 920.0058074221429
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 176.24,
+      "exit_price": 183.16587500000003,
+      "shares": 0.2356,
+      "pnl": 1.6317361500000045,
+      "pnl_pct": 3.929797435315489,
+      "entry_date": "2025-09-18",
+      "exit_date": "2025-09-22",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 908.2310299407142
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 245.5,
+      "exit_price": 254.7152,
+      "shares": 0.1785,
+      "pnl": 1.6449132000000017,
+      "pnl_pct": 3.7536456211812665,
+      "entry_date": "2025-09-19",
+      "exit_date": "2025-09-22",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 924.8356943907143
+    },
+    {
+      "symbol": "META",
+      "entry_price": 765.16,
+      "exit_price": 779.837025,
+      "shares": 0.0043,
+      "pnl": 0.06311120750000031,
+      "pnl_pct": 1.9181641748131206,
+      "entry_date": "2025-09-22",
+      "exit_date": "2025-09-23",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 922.3866597407142
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 183.61,
+      "exit_price": 176.11379285714287,
+      "shares": 0.3591,
+      "pnl": -2.6918879850000006,
+      "pnl_pct": -4.0826791257868,
+      "entry_date": "2025-09-22",
+      "exit_date": "2025-09-24",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 922.3866597407142
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 176.97,
+      "exit_price": 178.90805,
+      "shares": 0.3404,
+      "pnl": 0.6597122200000013,
+      "pnl_pct": 1.0951291179295948,
+      "entry_date": "2025-09-24",
+      "exit_date": "2025-09-25",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 907.2064619632142
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 256.08,
+      "exit_price": 254.43,
+      "shares": 3.3309,
+      "pnl": -5.495984999999925,
+      "pnl_pct": -0.6443298969072077,
+      "entry_date": "2025-09-22",
+      "exit_date": "2025-09-29",
+      "days_held": 7,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 922.3866597407142
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 509.23,
+      "exit_price": 514.6,
+      "shares": 0.0066,
+      "pnl": 0.03544200000000003,
+      "pnl_pct": 1.0545333150050085,
+      "entry_date": "2025-09-23",
+      "exit_date": "2025-09-29",
+      "days_held": 6,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 915.0936479482143
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 161.27,
+      "exit_price": 163.06775000000002,
+      "shares": 0.3775,
+      "pnl": 0.678650625000003,
+      "pnl_pct": 1.1147454579277036,
+      "entry_date": "2025-09-25",
+      "exit_date": "2025-09-29",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 923.0344861832143
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 161.36,
+      "exit_price": 163.06775000000002,
+      "shares": 3.4047,
+      "pnl": 5.814376425000015,
+      "pnl_pct": 1.0583477937531012,
+      "entry_date": "2025-09-29",
+      "exit_date": "2025-09-30",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 915.6357028082143
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 444.72,
+      "exit_price": 458.822825,
+      "shares": 0.5994,
+      "pnl": 8.453233304999998,
+      "pnl_pct": 3.1711694999100546,
+      "entry_date": "2025-09-30",
+      "exit_date": "2025-10-01",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 921.4500792332143
+    },
+    {
+      "symbol": "META",
+      "entry_price": 734.38,
+      "exit_price": 710.3706999999999,
+      "shares": 0.0181,
+      "pnl": -0.434568330000001,
+      "pnl_pct": -3.269329230098866,
+      "entry_date": "2025-09-30",
+      "exit_date": "2025-10-01",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 921.4500792332144
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 186.58,
+      "exit_price": 189.61712500000002,
+      "shares": 3.4348,
+      "pnl": 10.43191695000001,
+      "pnl_pct": 1.6277870082538337,
+      "entry_date": "2025-09-30",
+      "exit_date": "2025-10-02",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 921.4500792332143
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 459.46,
+      "exit_price": 436.48699999999997,
+      "shares": 1.4238,
+      "pnl": -32.70895740000002,
+      "pnl_pct": -5.000000000000003,
+      "entry_date": "2025-10-01",
+      "exit_date": "2025-10-02",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1331.7357122082144
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 164.01,
+      "exit_price": 169.77705,
+      "shares": 0.1994,
+      "pnl": 1.1499497700000023,
+      "pnl_pct": 3.5162794951527423,
+      "entry_date": "2025-10-01",
+      "exit_date": "2025-10-02",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1331.7357122082142
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 169.73,
+      "exit_price": 189.31812499999998,
+      "shares": 0.0001,
+      "pnl": 0.001958812499999999,
+      "pnl_pct": 11.540755906439635,
+      "entry_date": "2025-10-02",
+      "exit_date": "2025-10-06",
+      "days_held": 4,
+      "exit_reason": "TAKE_PROFIT",
+      "equity_at_entry": 1308.3416535282142
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 257.13,
+      "exit_price": 256.48,
+      "shares": 5.0882,
+      "pnl": -3.307329999999884,
+      "pnl_pct": -0.2527904172986339,
+      "entry_date": "2025-10-02",
+      "exit_date": "2025-10-07",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 1308.3416535282142
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 185.54,
+      "exit_price": 187.64205,
+      "shares": 0.0001,
+      "pnl": 0.000210205000000002,
+      "pnl_pct": 1.1329362940605907,
+      "entry_date": "2025-10-06",
+      "exit_date": "2025-10-07",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1306.1048043407145
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 211.51,
+      "exit_price": 234.100975,
+      "shares": 3.7021,
+      "pnl": 83.63404854750006,
+      "pnl_pct": 10.680807054040006,
+      "entry_date": "2025-10-07",
+      "exit_date": "2025-10-08",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1305.0364925457145
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 189.11,
+      "exit_price": 193.83525000000003,
+      "shares": 0.3488,
+      "pnl": 1.6481672000000058,
+      "pnl_pct": 2.4986780180847217,
+      "entry_date": "2025-10-08",
+      "exit_date": "2025-10-09",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1388.6705410932145
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 258.06,
+      "exit_price": 251.1560357142857,
+      "shares": 5.1121,
+      "pnl": -35.29375582500005,
+      "pnl_pct": -2.675332979041423,
+      "entry_date": "2025-10-08",
+      "exit_date": "2025-10-10",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1388.6705410932145
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 438.69,
+      "exit_price": 416.7555,
+      "shares": 0.0075,
+      "pnl": -0.1645087500000001,
+      "pnl_pct": -5.000000000000003,
+      "entry_date": "2025-10-08",
+      "exit_date": "2025-10-10",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1388.6705410932145
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 522.4,
+      "exit_price": 511.07545,
+      "shares": 0.1233,
+      "pnl": -1.3963170149999986,
+      "pnl_pct": -2.167792879019906,
+      "entry_date": "2025-10-09",
+      "exit_date": "2025-10-10",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1369.7444412932145
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 510.96,
+      "exit_price": 519.6531500000001,
+      "shares": 2.5164,
+      "pnl": 21.875442660000292,
+      "pnl_pct": 1.7013366995459756,
+      "entry_date": "2025-10-10",
+      "exit_date": "2025-10-13",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1353.4641267032148
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 183.16,
+      "exit_price": 194.15285,
+      "shares": 0.3511,
+      "pnl": 3.8595896350000016,
+      "pnl_pct": 6.0017744048919,
+      "entry_date": "2025-10-10",
+      "exit_date": "2025-10-13",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1353.4641267032148
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 214.9,
+      "exit_price": 232.46335000000002,
+      "shares": 0.0149,
+      "pnl": 0.2616939150000002,
+      "pnl_pct": 8.172801302931603,
+      "entry_date": "2025-10-10",
+      "exit_date": "2025-10-13",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1353.4641267032148
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 247.66,
+      "exit_price": 249.93135,
+      "shares": 5.2915,
+      "pnl": 12.018848525000067,
+      "pnl_pct": 0.9171242832916146,
+      "entry_date": "2025-10-13",
+      "exit_date": "2025-10-15",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1379.4608529132151
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 188.32,
+      "exit_price": 179.56804642857142,
+      "shares": 0.0173,
+      "pnl": -0.15140879678571428,
+      "pnl_pct": -4.647384012016021,
+      "entry_date": "2025-10-13",
+      "exit_date": "2025-10-15",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1379.4608529132151
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 514.05,
+      "exit_price": 516.79,
+      "shares": 0.1275,
+      "pnl": 0.34935000000000116,
+      "pnl_pct": 0.5330220795642464,
+      "entry_date": "2025-10-13",
+      "exit_date": "2025-10-20",
+      "days_held": 7,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 1379.4608529132151
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 435.15,
+      "exit_price": 446.42650000000003,
+      "shares": 1.9183,
+      "pnl": 21.631709950000104,
+      "pnl_pct": 2.591405262553155,
+      "entry_date": "2025-10-15",
+      "exit_date": "2025-10-20",
+      "days_held": 5,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1391.2492426414294
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 238.6,
+      "exit_price": 241.0584,
+      "shares": 1.9551,
+      "pnl": 4.806417840000023,
+      "pnl_pct": 1.0303436714166017,
+      "entry_date": "2025-10-15",
+      "exit_date": "2025-10-20",
+      "days_held": 5,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1391.2492426414294
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 256.55,
+      "exit_price": 247.65189285714285,
+      "shares": 0.0037,
+      "pnl": -0.03292299642857148,
+      "pnl_pct": -3.4683715232341283,
+      "entry_date": "2025-10-20",
+      "exit_date": "2025-10-21",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1418.1157704314296
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 516.79,
+      "exit_price": 521.290775,
+      "shares": 0.0376,
+      "pnl": 0.1692291400000034,
+      "pnl_pct": 0.8709098473267846,
+      "entry_date": "2025-10-20",
+      "exit_date": "2025-10-22",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1418.1157704314296
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 250.46,
+      "exit_price": 254.43730000000002,
+      "shares": 0.0037,
+      "pnl": 0.014716010000000052,
+      "pnl_pct": 1.5879980835263172,
+      "entry_date": "2025-10-21",
+      "exit_date": "2025-10-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1420.9403534350006
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 234.99,
+      "exit_price": 251.489575,
+      "shares": 0.0042,
+      "pnl": 0.06929821499999997,
+      "pnl_pct": 7.021394527426696,
+      "entry_date": "2025-10-23",
+      "exit_date": "2025-10-24",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1404.0895245850008
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 262.24,
+      "exit_price": 267.1016,
+      "shares": 5.3298,
+      "pnl": 25.91135568000005,
+      "pnl_pct": 1.8538743136058606,
+      "entry_date": "2025-10-20",
+      "exit_date": "2025-10-27",
+      "days_held": 7,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1418.1157704314296
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 448.98,
+      "exit_price": 456.70880000000005,
+      "shares": 0.0435,
+      "pnl": 0.3362028000000015,
+      "pnl_pct": 1.7214129805336618,
+      "entry_date": "2025-10-23",
+      "exit_date": "2025-10-27",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1404.0895245850008
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 523.61,
+      "exit_price": 530.5706500000001,
+      "shares": 0.002,
+      "pnl": 0.013921300000000202,
+      "pnl_pct": 1.3293577280800788,
+      "entry_date": "2025-10-24",
+      "exit_date": "2025-10-27",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1420.763564800001
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 259.67,
+      "exit_price": 262.59565,
+      "shares": 0.2983,
+      "pnl": 0.8727213949999887,
+      "pnl_pct": 1.1266800169445688,
+      "entry_date": "2025-10-27",
+      "exit_date": "2025-10-28",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1444.597570580001
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 269.27,
+      "exit_price": 273.27098,
+      "shares": 0.0144,
+      "pnl": 0.057614112000000384,
+      "pnl_pct": 1.485861774427165,
+      "entry_date": "2025-10-27",
+      "exit_date": "2025-10-29",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1444.597570580001
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 542.07,
+      "exit_price": 549.5671000000001,
+      "shares": 0.1376,
+      "pnl": 1.0316009600000062,
+      "pnl_pct": 1.383050159573495,
+      "entry_date": "2025-10-28",
+      "exit_date": "2025-10-29",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1446.4078049750012
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 268.81,
+      "exit_price": 272.08395,
+      "shares": 5.0707,
+      "pnl": 16.60121826500007,
+      "pnl_pct": 1.2179420408466999,
+      "entry_date": "2025-10-27",
+      "exit_date": "2025-10-30",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1444.597570580001
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 541.55,
+      "exit_price": 528.2548249999999,
+      "shares": 0.1465,
+      "pnl": -1.9477431375000125,
+      "pnl_pct": -2.455022620256687,
+      "entry_date": "2025-10-29",
+      "exit_date": "2025-10-30",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1451.072430047001
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 207.04,
+      "exit_price": 210.59847575,
+      "shares": 0.0191,
+      "pnl": 0.06796688682500025,
+      "pnl_pct": 1.718738287287487,
+      "entry_date": "2025-10-29",
+      "exit_date": "2025-10-30",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1451.072430047001
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 271.4,
+      "exit_price": 275.2401,
+      "shares": 5.3842,
+      "pnl": 20.675866420000037,
+      "pnl_pct": 1.4149226234340486,
+      "entry_date": "2025-10-30",
+      "exit_date": "2025-10-31",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1461.2809490613263
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 270.37,
+      "exit_price": 275.2401,
+      "shares": 5.4812,
+      "pnl": 26.693992119999887,
+      "pnl_pct": 1.8012723305100338,
+      "entry_date": "2025-10-31",
+      "exit_date": "2025-11-03",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1481.9568154813264
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 517.03,
+      "exit_price": 521.0228000000001,
+      "shares": 3.507,
+      "pnl": 14.002749600000358,
+      "pnl_pct": 0.7722569289983371,
+      "entry_date": "2025-11-03",
+      "exit_date": "2025-11-04",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1908.6508076013263
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 468.37,
+      "exit_price": 444.9515,
+      "shares": 0.1936,
+      "pnl": -4.533821599999999,
+      "pnl_pct": -4.999999999999999,
+      "entry_date": "2025-11-03",
+      "exit_date": "2025-11-04",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1908.6508076013263
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 259.65,
+      "exit_price": 246.66749999999996,
+      "shares": 0.0174,
+      "pnl": -0.22589550000000025,
+      "pnl_pct": -5.000000000000006,
+      "entry_date": "2025-11-03",
+      "exit_date": "2025-11-05",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1908.6508076013263
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 444.26,
+      "exit_price": 462.83242575,
+      "shares": 2.5903,
+      "pnl": 48.1081544202251,
+      "pnl_pct": 4.180530713996317,
+      "entry_date": "2025-11-04",
+      "exit_date": "2025-11-05",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1917.9526956013267
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 256.33,
+      "exit_price": 243.51349999999996,
+      "shares": 4.6019,
+      "pnl": -58.98025135000008,
+      "pnl_pct": -5.000000000000008,
+      "entry_date": "2025-11-05",
+      "exit_date": "2025-11-06",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1966.001994521552
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 250.2,
+      "exit_price": 238.9805357142857,
+      "shares": 2.9859,
+      "pnl": -33.50019841071427,
+      "pnl_pct": -4.48419835560123,
+      "entry_date": "2025-11-05",
+      "exit_date": "2025-11-07",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1966.001994521552
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 445.91,
+      "exit_price": 423.6145,
+      "shares": 2.5373,
+      "pnl": -56.57037215000001,
+      "pnl_pct": -5.000000000000001,
+      "entry_date": "2025-11-06",
+      "exit_date": "2025-11-07",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1885.6426991715516
+    },
+    {
+      "symbol": "META",
+      "entry_price": 621.71,
+      "exit_price": 630.2375000000001,
+      "shares": 1.7535,
+      "pnl": 14.952971250000056,
+      "pnl_pct": 1.3716202087790177,
+      "entry_date": "2025-11-07",
+      "exit_date": "2025-11-10",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1816.9511726108376
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 244.41,
+      "exit_price": 249.86187500000003,
+      "shares": 2.8249,
+      "pnl": 15.401001687500083,
+      "pnl_pct": 2.230626815596755,
+      "entry_date": "2025-11-07",
+      "exit_date": "2025-11-10",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1816.9511726108376
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 269.43,
+      "exit_price": 273.84067500000003,
+      "shares": 6.8563,
+      "pnl": 30.24091100250018,
+      "pnl_pct": 1.637039305199876,
+      "entry_date": "2025-11-10",
+      "exit_date": "2025-11-11",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1847.3051455483378
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 199.05,
+      "exit_price": 189.0975,
+      "shares": 0.0001,
+      "pnl": -0.0009952500000000016,
+      "pnl_pct": -5.000000000000007,
+      "entry_date": "2025-11-10",
+      "exit_date": "2025-11-13",
+      "days_held": 3,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1847.3051455483378
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 439.62,
+      "exit_price": 417.639,
+      "shares": 0.2029,
+      "pnl": -4.459944899999999,
+      "pnl_pct": -4.999999999999999,
+      "entry_date": "2025-11-11",
+      "exit_date": "2025-11-13",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1877.5454675508379
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 237.58,
+      "exit_price": 241.921875,
+      "shares": 0.3576,
+      "pnl": 1.5526544999999954,
+      "pnl_pct": 1.8275423015405283,
+      "entry_date": "2025-11-13",
+      "exit_date": "2025-11-14",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1858.1808864008378
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 275.25,
+      "exit_price": 267.67008214285715,
+      "shares": 6.4801,
+      "pnl": -49.118625706071356,
+      "pnl_pct": -2.7538302841572557,
+      "entry_date": "2025-11-11",
+      "exit_date": "2025-11-17",
+      "days_held": 6,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1877.5454675508379
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 276.41,
+      "exit_price": 291.745375,
+      "shares": 0.0157,
+      "pnl": 0.24076538749999996,
+      "pnl_pct": 5.548053616005209,
+      "entry_date": "2025-11-14",
+      "exit_date": "2025-11-17",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1856.234286900838
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 190.17,
+      "exit_price": 180.6615,
+      "shares": 0.4545,
+      "pnl": -4.3216132499999995,
+      "pnl_pct": -5.0,
+      "entry_date": "2025-11-14",
+      "exit_date": "2025-11-18",
+      "days_held": 4,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1856.234286900838
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 285.02,
+      "exit_price": 291.745375,
+      "shares": 0.2898,
+      "pnl": 1.9490136750000122,
+      "pnl_pct": 2.359615114728806,
+      "entry_date": "2025-11-17",
+      "exit_date": "2025-11-18",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1824.1373455822666
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 267.46,
+      "exit_price": 270.168425,
+      "shares": 6.178,
+      "pnl": 16.73264965000021,
+      "pnl_pct": 1.0126467509160375,
+      "entry_date": "2025-11-17",
+      "exit_date": "2025-11-19",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1824.1373455822666
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 284.28,
+      "exit_price": 301.531425,
+      "shares": 0.5715,
+      "pnl": 9.859189387500024,
+      "pnl_pct": 6.068462431405671,
+      "entry_date": "2025-11-18",
+      "exit_date": "2025-11-19",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1823.2637510072668
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 268.56,
+      "exit_price": 273.364275,
+      "shares": 6.5598,
+      "pnl": 31.51508314500012,
+      "pnl_pct": 1.7889019213583621,
+      "entry_date": "2025-11-19",
+      "exit_date": "2025-11-20",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1849.9791500447668
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 186.52,
+      "exit_price": 194.53,
+      "shares": 0.4496,
+      "pnl": 3.601295999999996,
+      "pnl_pct": 4.294445635856739,
+      "entry_date": "2025-11-19",
+      "exit_date": "2025-11-20",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1849.9791500447668
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 292.81,
+      "exit_price": 304.12185000000005,
+      "shares": 0.0143,
+      "pnl": 0.16175945500000072,
+      "pnl_pct": 3.8632048085789594,
+      "entry_date": "2025-11-19",
+      "exit_date": "2025-11-20",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1849.9791500447668
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 289.45,
+      "exit_price": 304.12185000000005,
+      "shares": 3.9079,
+      "pnl": 57.33612261500025,
+      "pnl_pct": 5.068871998618092,
+      "entry_date": "2025-11-20",
+      "exit_date": "2025-11-21",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1885.2572886447667
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 271.49,
+      "exit_price": 274.9225,
+      "shares": 6.5239,
+      "pnl": 22.39328675000003,
+      "pnl_pct": 1.264319127776347,
+      "entry_date": "2025-11-21",
+      "exit_date": "2025-11-24",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1942.593411259767
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 299.66,
+      "exit_price": 317.0839,
+      "shares": 0.5434,
+      "pnl": 9.468147260000002,
+      "pnl_pct": 5.81455649736368,
+      "entry_date": "2025-11-21",
+      "exit_date": "2025-11-24",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1942.593411259767
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 275.92,
+      "exit_price": 278.27715,
+      "shares": 6.4582,
+      "pnl": 15.222946129999935,
+      "pnl_pct": 0.8542874746303238,
+      "entry_date": "2025-11-24",
+      "exit_date": "2025-11-25",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1974.4548452697668
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 215.05,
+      "exit_price": 204.2975,
+      "shares": 0.0426,
+      "pnl": -0.45805649999999987,
+      "pnl_pct": -4.999999999999999,
+      "entry_date": "2025-11-24",
+      "exit_date": "2025-11-25",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 1974.4548452697668
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 417.78,
+      "exit_price": 423.73795,
+      "shares": 0.4377,
+      "pnl": 2.607794715000017,
+      "pnl_pct": 1.4260974675666713,
+      "entry_date": "2025-11-24",
+      "exit_date": "2025-11-26",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1974.4548452697668
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 476.99,
+      "exit_price": 484.64767500000005,
+      "shares": 3.3602,
+      "pnl": 25.731319535000132,
+      "pnl_pct": 1.6054162561060064,
+      "entry_date": "2025-11-25",
+      "exit_date": "2025-11-26",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1989.9288088997669
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 323.44,
+      "exit_price": 326.363775,
+      "shares": 0.5979,
+      "pnl": 1.7481250724999866,
+      "pnl_pct": 0.9039620949789692,
+      "entry_date": "2025-11-25",
+      "exit_date": "2025-11-26",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 1989.9288088997666
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 229.16,
+      "exit_price": 231.53536250000002,
+      "shares": 3.3485,
+      "pnl": 7.953901331250076,
+      "pnl_pct": 1.0365519724210257,
+      "entry_date": "2025-11-26",
+      "exit_date": "2025-11-28",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2019.306974222267
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 426.58,
+      "exit_price": 430.40745075,
+      "shares": 2.8402,
+      "pnl": 10.870725620150072,
+      "pnl_pct": 0.8972410216137712,
+      "entry_date": "2025-11-26",
+      "exit_date": "2025-12-01",
+      "days_held": 5,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2019.306974222267
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 233.22,
+      "exit_price": 237.177725,
+      "shares": 3.3226,
+      "pnl": 13.149937085000035,
+      "pnl_pct": 1.6969921104536534,
+      "entry_date": "2025-11-28",
+      "exit_date": "2025-12-02",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2037.457193553517
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 283.1,
+      "exit_price": 285.2445,
+      "shares": 5.5813,
+      "pnl": 11.969097849999963,
+      "pnl_pct": 0.7575061815612835,
+      "entry_date": "2025-12-01",
+      "exit_date": "2025-12-02",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2440.324517173667
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 446.74,
+      "exit_price": 451.220275,
+      "shares": 0.0006,
+      "pnl": 0.002688165000000003,
+      "pnl_pct": 1.002881989524109,
+      "entry_date": "2025-12-03",
+      "exit_date": "2025-12-04",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2445.694192108667
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 229.11,
+      "exit_price": 231.74875,
+      "shares": 0.0001,
+      "pnl": 0.00026387499999999876,
+      "pnl_pct": 1.1517393391820467,
+      "entry_date": "2025-12-04",
+      "exit_date": "2025-12-05",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2416.0058352736673
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 286.19,
+      "exit_price": 277.6033142857143,
+      "shares": 8.6061,
+      "pnl": -73.8978759257141,
+      "pnl_pct": -3.000344426529821,
+      "entry_date": "2025-12-02",
+      "exit_date": "2025-12-08",
+      "days_held": 6,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2463.250636108667
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 480.84,
+      "exit_price": 488.60775,
+      "shares": 0.0005,
+      "pnl": 0.0038838750000000175,
+      "pnl_pct": 1.6154542051410106,
+      "entry_date": "2025-12-04",
+      "exit_date": "2025-12-08",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2416.0058352736673
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 217.97,
+      "exit_price": 222.03217500000002,
+      "shares": 0.0001,
+      "pnl": 0.0004062175000000025,
+      "pnl_pct": 1.8636394916731773,
+      "entry_date": "2025-12-05",
+      "exit_date": "2025-12-08",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2399.483547148667
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 221.11,
+      "exit_price": 223.15370000000001,
+      "shares": 0.9319,
+      "pnl": 1.904524030000001,
+      "pnl_pct": 0.9242910768395827,
+      "entry_date": "2025-12-08",
+      "exit_date": "2025-12-09",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2389.360002315453
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 221.62,
+      "exit_price": 210.539,
+      "shares": 0.0469,
+      "pnl": -0.5196989000000007,
+      "pnl_pct": -5.000000000000008,
+      "entry_date": "2025-12-09",
+      "exit_date": "2025-12-11",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2395.688926345453
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 221.43,
+      "exit_price": 210.3585,
+      "shares": 0.0447,
+      "pnl": -0.4948960500000006,
+      "pnl_pct": -5.000000000000006,
+      "entry_date": "2025-12-11",
+      "exit_date": "2025-12-12",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2357.978022445454
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 491.02,
+      "exit_price": 474.8187678571428,
+      "shares": 4.4244,
+      "pnl": -71.6807314928573,
+      "pnl_pct": -3.299505548217421,
+      "entry_date": "2025-12-08",
+      "exit_date": "2025-12-15",
+      "days_held": 7,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2389.360002315453
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 277.18,
+      "exit_price": 274.11,
+      "shares": 0.7499,
+      "pnl": -2.302192999999995,
+      "pnl_pct": -1.1075835197344663,
+      "entry_date": "2025-12-09",
+      "exit_date": "2025-12-15",
+      "days_held": 6,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2395.6889263454536
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 475.31,
+      "exit_price": 487.81375,
+      "shares": 3.335,
+      "pnl": 41.70000625000008,
+      "pnl_pct": 2.6306515747617394,
+      "entry_date": "2025-12-15",
+      "exit_date": "2025-12-16",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2316.267006902596
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 308.22,
+      "exit_price": 296.27002500000003,
+      "shares": 2.2534,
+      "pnl": -26.92807366499999,
+      "pnl_pct": -3.8770926610862344,
+      "entry_date": "2025-12-15",
+      "exit_date": "2025-12-17",
+      "days_held": 2,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2316.267006902596
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 489.88,
+      "exit_price": 467.8504321428572,
+      "shares": 3.206,
+      "pnl": -70.62679454999984,
+      "pnl_pct": -4.496931464265291,
+      "entry_date": "2025-12-16",
+      "exit_date": "2025-12-17",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2354.248903152596
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 467.26,
+      "exit_price": 491.56530075,
+      "shares": 2.9026,
+      "pnl": 70.54856595695004,
+      "pnl_pct": 5.201665186405858,
+      "entry_date": "2025-12-17",
+      "exit_date": "2025-12-18",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2260.412144937596
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 302.46,
+      "exit_price": 304.945625,
+      "shares": 5.9348,
+      "pnl": 14.751687250000161,
+      "pnl_pct": 0.8218028830258637,
+      "entry_date": "2025-12-18",
+      "exit_date": "2025-12-19",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2330.960710894546
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 273.67,
+      "exit_price": 273.81,
+      "shares": 8.5713,
+      "pnl": 1.199981999999883,
+      "pnl_pct": 0.05115650235684814,
+      "entry_date": "2025-12-19",
+      "exit_date": "2025-12-24",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2345.7123981445466
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 273.81,
+      "exit_price": 273.76,
+      "shares": 8.5713,
+      "pnl": -0.4285650000000975,
+      "pnl_pct": -0.01826083780724275,
+      "entry_date": "2025-12-24",
+      "exit_date": "2025-12-29",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2346.912380144546
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 273.76,
+      "exit_price": 267.80392857142857,
+      "shares": 8.5713,
+      "pnl": -51.05127503571421,
+      "pnl_pct": -2.1756543792268483,
+      "entry_date": "2025-12-29",
+      "exit_date": "2026-01-05",
+      "days_held": 7,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2346.483815144546
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 223.47,
+      "exit_price": 232.26485000000002,
+      "shares": 1.7005,
+      "pnl": 14.955642425000041,
+      "pnl_pct": 3.9355841947465096,
+      "entry_date": "2026-01-02",
+      "exit_date": "2026-01-05",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2722.912740144546
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 226.5,
+      "exit_price": 233.692065,
+      "shares": 0.0839,
+      "pnl": 0.6034142535000012,
+      "pnl_pct": 3.175304635761596,
+      "entry_date": "2026-01-02",
+      "exit_date": "2026-01-05",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2722.912740144546
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 233.06,
+      "exit_price": 241.35615,
+      "shares": 11.0506,
+      "pnl": 91.67743519000012,
+      "pnl_pct": 3.5596627477902736,
+      "entry_date": "2026-01-05",
+      "exit_date": "2026-01-06",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2710.991596787332
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 214.35,
+      "exit_price": 221.2481,
+      "shares": 7.8451,
+      "pnl": 54.11628431,
+      "pnl_pct": 3.218147888966643,
+      "entry_date": "2026-01-06",
+      "exit_date": "2026-01-07",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2802.669031977332
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 240.93,
+      "exit_price": 243.450325,
+      "shares": 4.4204,
+      "pnl": 11.140844629999936,
+      "pnl_pct": 1.046081849499849,
+      "entry_date": "2026-01-06",
+      "exit_date": "2026-01-07",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2802.669031977332
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 321.98,
+      "exit_price": 327.842203,
+      "shares": 2.2095,
+      "pnl": 12.952537528499922,
+      "pnl_pct": 1.8206730231691302,
+      "entry_date": "2026-01-07",
+      "exit_date": "2026-01-08",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2867.926160917332
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 435.8,
+      "exit_price": 445.68212500000004,
+      "shares": 1.6607,
+      "pnl": 16.41124498750005,
+      "pnl_pct": 2.2675826067003286,
+      "entry_date": "2026-01-08",
+      "exit_date": "2026-01-09",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2835.272720445831
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 189.11,
+      "exit_price": 184.94,
+      "shares": 11.2054,
+      "pnl": -46.726518000000176,
+      "pnl_pct": -2.2050658346993894,
+      "entry_date": "2026-01-07",
+      "exit_date": "2026-01-12",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2867.926160917332
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 445.01,
+      "exit_price": 450.89275000000004,
+      "shares": 1.5841,
+      "pnl": 9.31886427500007,
+      "pnl_pct": 1.3219365856947136,
+      "entry_date": "2026-01-09",
+      "exit_date": "2026-01-12",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2849.827114433332
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 246.29,
+      "exit_price": 242.6,
+      "shares": 0.1469,
+      "pnl": -0.5420609999999997,
+      "pnl_pct": -1.498233789435218,
+      "entry_date": "2026-01-08",
+      "exit_date": "2026-01-13",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2835.272720445831
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 184.94,
+      "exit_price": 186.69907575000002,
+      "shares": 12.4452,
+      "pnl": 21.892049523900276,
+      "pnl_pct": 0.951160241159307,
+      "entry_date": "2026-01-12",
+      "exit_date": "2026-01-13",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2859.9087317083317
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 185.81,
+      "exit_price": 188.27725,
+      "shares": 0.6098,
+      "pnl": 1.5045290500000044,
+      "pnl_pct": 1.3278348850976842,
+      "entry_date": "2026-01-13",
+      "exit_date": "2026-01-15",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2879.288006232232
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 261.05,
+      "exit_price": 255.21339285714288,
+      "shares": 8.6803,
+      "pnl": -50.66350098214278,
+      "pnl_pct": -2.2358196295181507,
+      "entry_date": "2026-01-13",
+      "exit_date": "2026-01-16",
+      "days_held": 3,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2879.288006232232
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 187.05,
+      "exit_price": 189.01170000000002,
+      "shares": 0.6134,
+      "pnl": 1.2033067800000046,
+      "pnl_pct": 1.048757016840421,
+      "entry_date": "2026-01-15",
+      "exit_date": "2026-01-16",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2846.606922282232
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 448.96,
+      "exit_price": 426.5848321428571,
+      "shares": 1.1047,
+      "pnl": -24.717847931785712,
+      "pnl_pct": -4.983777587567457,
+      "entry_date": "2026-01-12",
+      "exit_date": "2026-01-20",
+      "days_held": 8,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2859.9087317083317
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 186.23,
+      "exit_price": 178.93638928571428,
+      "shares": 0.5962,
+      "pnl": -4.348450707857137,
+      "pnl_pct": -3.916453157002473,
+      "entry_date": "2026-01-16",
+      "exit_date": "2026-01-20",
+      "days_held": 4,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2820.616751080089
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 459.86,
+      "exit_price": 447.5036214285715,
+      "shares": 4.8285,
+      "pnl": -59.662773932142684,
+      "pnl_pct": -2.686987033320692,
+      "entry_date": "2026-01-16",
+      "exit_date": "2026-01-21",
+      "days_held": 5,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 2820.616751080089
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 231.92,
+      "exit_price": 251.00325,
+      "shares": 2.3913,
+      "pnl": 45.633775725000056,
+      "pnl_pct": 8.228376164194561,
+      "entry_date": "2026-01-20",
+      "exit_date": "2026-01-21",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2778.4261244404465
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 247.65,
+      "exit_price": 249.6733,
+      "shares": 10.6235,
+      "pnl": 21.494527550000065,
+      "pnl_pct": 0.8169997981021627,
+      "entry_date": "2026-01-21",
+      "exit_date": "2026-01-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2790.181316233304
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 183.32,
+      "exit_price": 184.77372499999998,
+      "shares": 0.8254,
+      "pnl": 1.199904614999993,
+      "pnl_pct": 0.7929985817150292,
+      "entry_date": "2026-01-21",
+      "exit_date": "2026-01-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2790.181316233304
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 249.8,
+      "exit_price": 254.1594,
+      "shares": 0.0303,
+      "pnl": 0.1320898199999998,
+      "pnl_pct": 1.7451561248999172,
+      "entry_date": "2026-01-21",
+      "exit_date": "2026-01-22",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2790.181316233304
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 184.84,
+      "exit_price": 188.178,
+      "shares": 10.3497,
+      "pnl": 34.54729859999994,
+      "pnl_pct": 1.8058861718242774,
+      "entry_date": "2026-01-22",
+      "exit_date": "2026-01-23",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2813.0078382183037
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 253.73,
+      "exit_price": 264.9578,
+      "shares": 0.1685,
+      "pnl": 1.8918843000000052,
+      "pnl_pct": 4.425097544634071,
+      "entry_date": "2026-01-22",
+      "exit_date": "2026-01-23",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2813.0078382183037
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 248.04,
+      "exit_price": 254.63580000000002,
+      "shares": 7.639,
+      "pnl": 50.3853162000002,
+      "pnl_pct": 2.6591678761490187,
+      "entry_date": "2026-01-23",
+      "exit_date": "2026-01-26",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2848.876241118304
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 465.95,
+      "exit_price": 470.693125,
+      "shares": 0.2033,
+      "pnl": 0.9642773125000041,
+      "pnl_pct": 1.0179472046356948,
+      "entry_date": "2026-01-23",
+      "exit_date": "2026-01-26",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2848.8762411183034
+    },
+    {
+      "symbol": "TSLA",
+      "entry_price": 449.36,
+      "exit_price": 430.9,
+      "shares": 1.9026,
+      "pnl": -35.121996000000074,
+      "pnl_pct": -4.108064803275779,
+      "entry_date": "2026-01-22",
+      "exit_date": "2026-01-27",
+      "days_held": 5,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2813.0078382183037
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 333.26,
+      "exit_price": 339.72282500000006,
+      "shares": 5.8319,
+      "pnl": 37.69054911750039,
+      "pnl_pct": 1.9392741403108884,
+      "entry_date": "2026-01-26",
+      "exit_date": "2026-01-29",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2873.855798630804
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 191.52,
+      "exit_price": 193.031325,
+      "shares": 0.2287,
+      "pnl": 0.34564002749999984,
+      "pnl_pct": 0.7891212406015033,
+      "entry_date": "2026-01-28",
+      "exit_date": "2026-01-30",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2875.7332426308044
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 244.68,
+      "exit_price": 242.96,
+      "shares": 3.5803,
+      "pnl": -6.158115999999995,
+      "pnl_pct": -0.7029589668137971,
+      "entry_date": "2026-01-27",
+      "exit_date": "2026-02-02",
+      "days_held": 6,
+      "exit_reason": "TIME_STOP",
+      "equity_at_entry": 2873.197769630804
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 258.28,
+      "exit_price": 268.46132500000004,
+      "shares": 7.2958,
+      "pnl": 74.28091093500052,
+      "pnl_pct": 3.9419718909710673,
+      "entry_date": "2026-01-29",
+      "exit_date": "2026-02-02",
+      "days_held": 4,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2893.029695748304
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 236.73,
+      "exit_price": 248.095225,
+      "shares": 0.5752,
+      "pnl": 6.537277420000006,
+      "pnl_pct": 4.800922992438647,
+      "entry_date": "2026-01-30",
+      "exit_date": "2026-02-02",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 2893.2037537758047
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 185.61,
+      "exit_price": 177.6676178571429,
+      "shares": 2.5549,
+      "pnl": -20.291992136785673,
+      "pnl_pct": -4.2790701701724725,
+      "entry_date": "2026-02-02",
+      "exit_date": "2026-02-03",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 3378.3708801308053
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 246.27,
+      "exit_price": 250.75512500000002,
+      "shares": 0.0963,
+      "pnl": 0.431917537500001,
+      "pnl_pct": 1.8212226418158974,
+      "entry_date": "2026-02-02",
+      "exit_date": "2026-02-03",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3378.3708801308053
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 270.01,
+      "exit_price": 276.857875,
+      "shares": 10.6633,
+      "pnl": 73.02094548749987,
+      "pnl_pct": 2.5361560682937627,
+      "entry_date": "2026-02-02",
+      "exit_date": "2026-02-04",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3378.3708801308053
+    },
+    {
+      "symbol": "AMD",
+      "entry_price": 242.11,
+      "exit_price": 230.0045,
+      "shares": 1.8807,
+      "pnl": -22.766813850000013,
+      "pnl_pct": -5.000000000000003,
+      "entry_date": "2026-02-03",
+      "exit_date": "2026-02-04",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 3352.85925653152
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 238.62,
+      "exit_price": 244.502375,
+      "shares": 0.0955,
+      "pnl": 0.5617668124999996,
+      "pnl_pct": 2.4651642779314376,
+      "entry_date": "2026-02-03",
+      "exit_date": "2026-02-04",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3352.85925653152
+    },
+    {
+      "symbol": "META",
+      "entry_price": 668.99,
+      "exit_price": 683.6637750000001,
+      "shares": 0.8505,
+      "pnl": 12.480045637500078,
+      "pnl_pct": 2.1934221737245836,
+      "entry_date": "2026-02-04",
+      "exit_date": "2026-02-05",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3409.326703981519
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 333.04,
+      "exit_price": 319.36080357142856,
+      "shares": 0.0854,
+      "pnl": -1.1682033750000027,
+      "pnl_pct": -4.107373417178555,
+      "entry_date": "2026-02-04",
+      "exit_date": "2026-02-05",
+      "days_held": 1,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 3409.326703981519
+    },
+    {
+      "symbol": "AAPL",
+      "entry_price": 276.49,
+      "exit_price": 278.7982125,
+      "shares": 10.1646,
+      "pnl": 23.462056777499672,
+      "pnl_pct": 0.8348267568447205,
+      "entry_date": "2026-02-04",
+      "exit_date": "2026-02-06",
+      "days_held": 2,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3409.326703981519
+    },
+    {
+      "symbol": "META",
+      "entry_price": 670.21,
+      "exit_price": 676.3887500000001,
+      "shares": 0.865,
+      "pnl": 5.3446187500000315,
+      "pnl_pct": 0.9219125348771334,
+      "entry_date": "2026-02-05",
+      "exit_date": "2026-02-06",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3414.7430782440197
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 401.14,
+      "exit_price": 411.778325,
+      "shares": 5.1584,
+      "pnl": 54.87673568000005,
+      "pnl_pct": 2.652022984494194,
+      "entry_date": "2026-02-06",
+      "exit_date": "2026-02-09",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3448.7110967715194
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 185.41,
+      "exit_price": 192.20755,
+      "shares": 6.9234,
+      "pnl": 47.062157670000005,
+      "pnl_pct": 3.6662262013915115,
+      "entry_date": "2026-02-06",
+      "exit_date": "2026-02-09",
+      "days_held": 3,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3448.7110967715194
+    },
+    {
+      "symbol": "GOOGL",
+      "entry_price": 331.25,
+      "exit_price": 315.46758928571427,
+      "shares": 0.0875,
+      "pnl": -1.3809609375000014,
+      "pnl_pct": -4.7645013477089,
+      "entry_date": "2026-02-05",
+      "exit_date": "2026-02-10",
+      "days_held": 5,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 3414.7430782440197
+    },
+    {
+      "symbol": "MSFT",
+      "entry_price": 413.6,
+      "exit_price": 420.5024,
+      "shares": 5.151,
+      "pnl": 35.5542624,
+      "pnl_pct": 1.6688588007736944,
+      "entry_date": "2026-02-09",
+      "exit_date": "2026-02-10",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3550.7777401215194
+    },
+    {
+      "symbol": "AMZN",
+      "entry_price": 208.72,
+      "exit_price": 211.21392500000002,
+      "shares": 6.3355,
+      "pnl": 15.800261837500116,
+      "pnl_pct": 1.1948663280950644,
+      "entry_date": "2026-02-09",
+      "exit_date": "2026-02-10",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3550.7777401215194
+    },
+    {
+      "symbol": "META",
+      "entry_price": 670.72,
+      "exit_price": 637.184,
+      "shares": 3.2216,
+      "pnl": -108.03957760000019,
+      "pnl_pct": -5.000000000000009,
+      "entry_date": "2026-02-10",
+      "exit_date": "2026-02-13",
+      "days_held": 3,
+      "exit_reason": "STOP_LOSS",
+      "equity_at_entry": 3601.3576784215197
+    },
+    {
+      "symbol": "NVDA",
+      "entry_price": 184.97,
+      "exit_price": 188.942225,
+      "shares": 11.3315,
+      "pnl": 45.0112675875001,
+      "pnl_pct": 2.147496891387797,
+      "entry_date": "2026-02-17",
+      "exit_date": "2026-02-18",
+      "days_held": 1,
+      "exit_reason": "TRAILING_STOP",
+      "equity_at_entry": 3493.3181008215197
+    }
+  ]
+}

@@ -37,6 +37,14 @@ class RiskManager:
         # VaR — portfolio daily returns history
         self._portfolio_returns: list[float] = []
 
+        # ATR-adaptive stops — current ATR % for each symbol
+        self._symbol_atr_pct: dict[str, float] = {}
+
+        # Circuit breaker state
+        self._circuit_breaker_active: bool = False
+        self._circuit_breaker_until: datetime | None = None
+        self._spy_open_price: float | None = None  # SPY price at market open
+
     # ── Pre-trade checks ──────────────────────────────────────────────────────
 
     async def can_place_order(
@@ -128,11 +136,40 @@ class RiskManager:
     # ── Stop-loss ─────────────────────────────────────────────────────────────
 
     async def check_stop_loss(self, position: Position) -> bool:
-        """Return True if the position should be stopped out."""
+        """Return True if the position should be stopped out.
+
+        Uses ATR-adaptive widening: when a symbol's ATR% is elevated
+        (above ATR_NORMAL_BASELINE_PCT), the SL is widened proportionally
+        up to ATR_STOP_MAX_WIDENING × baseline.  This prevents getting
+        whipsawed out by normal noise in high-vol regimes.
+        """
         if position.is_closed:
             return False
 
         stop_pct = Decimal(str(self.settings.STOP_LOSS_PERCENT))
+
+        # ATR-adaptive widening
+        if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False):
+            atr_pct = self._symbol_atr_pct.get(position.symbol, 0.0)
+            baseline = getattr(self.settings, "ATR_NORMAL_BASELINE_PCT", 0.3)
+            max_widening = getattr(self.settings, "ATR_STOP_MAX_WIDENING", 3.0)
+            multiplier = getattr(self.settings, "ATR_STOP_MULTIPLIER", 1.5)
+
+            if atr_pct > 0 and baseline > 0 and atr_pct > baseline:
+                # How many times higher is current ATR vs normal?
+                vol_ratio = atr_pct / baseline
+                # Widen SL proportionally: e.g. 2x vol → 2x SL, capped
+                widening = min(vol_ratio * multiplier, max_widening)
+                widened_pct = Decimal(str(float(stop_pct) * widening))
+                if widened_pct > stop_pct:
+                    logger.debug(
+                        "ATR-adaptive SL for {}: {:.2f}% -> {:.2f}% "
+                        "(ATR={:.2f}% vs baseline={:.2f}%, widening={:.1f}x)",
+                        position.symbol, stop_pct, widened_pct,
+                        atr_pct, baseline, widening,
+                    )
+                    stop_pct = widened_pct
+
         if position.side == "LONG":
             loss_pct = (
                 (position.entry_price - position.current_price)
@@ -154,6 +191,62 @@ class RiskManager:
                 stop_pct,
             )
             return True
+        return False
+
+    def update_symbol_atr(self, symbol: str, atr_pct: float) -> None:
+        """Store the latest ATR % for a symbol (called from engine)."""
+        self._symbol_atr_pct[symbol] = atr_pct
+
+    # ── Circuit Breaker ───────────────────────────────────────────────────────
+
+    def update_spy_open(self, price: float) -> None:
+        """Set SPY's opening price for circuit breaker calculation."""
+        self._spy_open_price = price
+
+    def check_circuit_breaker(self, spy_price: float) -> bool:
+        """Check if SPY has dropped enough to trigger a circuit breaker pause.
+
+        Returns True if the circuit breaker is ACTIVE (trading should pause).
+        """
+        if not getattr(self.settings, "CIRCUIT_BREAKER_ENABLED", True):
+            return False
+
+        # Check if existing circuit breaker has expired
+        if self._circuit_breaker_until:
+            if datetime.now(timezone.utc) >= self._circuit_breaker_until:
+                if self._circuit_breaker_active:
+                    logger.info("Circuit breaker cooldown expired — resuming entries")
+                self._circuit_breaker_active = False
+                self._circuit_breaker_until = None
+            else:
+                return True  # Still paused
+
+        if self._spy_open_price and self._spy_open_price > 0:
+            drop_pct = (self._spy_open_price - spy_price) / self._spy_open_price * 100
+            threshold = getattr(self.settings, "CIRCUIT_BREAKER_SPY_DROP_PCT", 4.0)
+            if drop_pct >= threshold:
+                pause_min = getattr(self.settings, "CIRCUIT_BREAKER_PAUSE_MINUTES", 30)
+                self._circuit_breaker_active = True
+                from datetime import timedelta as _td
+                self._circuit_breaker_until = datetime.now(timezone.utc) + \
+                    _td(minutes=pause_min)
+                logger.warning(
+                    "CIRCUIT BREAKER TRIGGERED — SPY dropped {:.1f}% "
+                    "(open={:.2f}, now={:.2f}). Pausing entries for {}min",
+                    drop_pct, self._spy_open_price, spy_price, pause_min,
+                )
+                return True
+
+        return False
+
+    @property
+    def is_circuit_breaker_active(self) -> bool:
+        """Return True if the circuit breaker pause is currently active."""
+        if self._circuit_breaker_until:
+            if datetime.now(timezone.utc) < self._circuit_breaker_until:
+                return True
+            self._circuit_breaker_active = False
+            self._circuit_breaker_until = None
         return False
 
     # ── PnL tracking ─────────────────────────────────────────────────────────

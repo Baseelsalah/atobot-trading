@@ -1,0 +1,10 @@
+[OK] Settings imports
+[OK] RiskManager imports
+[OK] AdaptiveStrategySelector imports
+[OK] MarketRegimeDetector imports
+[OK] TradingEngine imports
+[OK] All new settings present
+[OK] Circuit breaker works
+[OK] Extreme vol blocking works
+
+=== ALL HARDENING CHECKS PASSED ===

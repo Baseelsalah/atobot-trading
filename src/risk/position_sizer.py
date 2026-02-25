@@ -193,8 +193,12 @@ class PositionSizer:
             base_qty *= self.regime_multiplier
             notes.append(f"Regime multiplier ×{self.regime_multiplier:.2f}")
 
-        # Floor at 1 share (or 0 if rejected)
-        final_qty = max(0, int(base_qty))
+        # Floor at 1 share (or fractional for small accounts, or 0 if rejected)
+        if self.account_size < 10000:
+            # Small account: allow fractional shares (Alpaca supports)
+            final_qty = max(Decimal("0"), Decimal(str(round(base_qty, 4))))
+        else:
+            final_qty = max(0, int(base_qty))
         final_heat = current_heat + (risk_dollars / self.account_size if self.account_size > 0 else 0)
 
         return SizingResult(

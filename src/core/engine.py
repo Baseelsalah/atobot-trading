@@ -101,6 +101,12 @@ class TradingEngine:
         self._heartbeat_interval = 60  # ticks
         self._last_scan_tick = 0  # Track last intraday scan
 
+        # ── Hardening state (v5: stress-test recommendations) ─────────
+        self._spy_open_set: bool = False  # Have we set SPY open today?
+        self._gap_filter_until: datetime | None = None  # Skip entries until this time
+        self._eod_flatten_done: bool = False  # Have we flattened today?
+        self._last_market_day: str = ""  # Track day rollovers for reset
+
     async def run(self) -> None:
         """Run the main trading loop.
 
@@ -212,6 +218,32 @@ class TradingEngine:
             try:
                 market_open = await self.exchange.is_market_open()
                 if not market_open:
+                    # ── Zero overnight risk guarantee ─────────────────
+                    # If market just closed and we still have positions, force close
+                    # BUT skip swing strategy positions (they hold overnight by design)
+                    if getattr(self.settings, "FORCE_EOD_FLATTEN", True):
+                        if not self.settings.DRY_RUN and hasattr(self.exchange, 'close_all_positions'):
+                            try:
+                                # Collect swing-exempt symbols
+                                swing_symbols = self._get_swing_exempt_symbols()
+                                positions = await self.exchange.get_positions() if hasattr(self.exchange, 'get_positions') else []
+                                non_swing = [p for p in positions if p['symbol'] not in swing_symbols]
+                                if non_swing:
+                                    logger.warning(
+                                        "ZERO OVERNIGHT: Market closed with {} day-trade positions — force closing! "
+                                        "({} swing positions kept)",
+                                        len(non_swing), len(positions) - len(non_swing),
+                                    )
+                                    for p in non_swing:
+                                        await self.exchange.close_position(p['symbol'])
+                                    if self.notifier:
+                                        await self.notifier.send_error_alert(
+                                            f"🚨 ZERO OVERNIGHT — Force-closed {len(non_swing)} day-trade positions "
+                                            f"(kept {len(positions) - len(non_swing)} swing positions)"
+                                        )
+                            except Exception as exc:
+                                logger.error("Zero overnight check failed: {}", exc)
+
                     if self._tick_count % 60 == 1:  # Log every ~5 min at 5s interval
                         # Show next open from calendar if available
                         next_open_str = ""
@@ -230,31 +262,73 @@ class TradingEngine:
             except Exception as exc:
                 logger.warning("Could not check market hours: {}", exc)
 
-        # ── EOD flatten check ─────────────────────────────────────────────
+        # ── EOD flatten check (hardened — zero overnight risk) ────────────
+        eod_block_entries = False
         if self.settings.FLATTEN_EOD and hasattr(self.exchange, 'get_market_clock'):
             try:
                 clock = await self.exchange.get_market_clock()
                 if clock.get("is_open"):
-                    from datetime import datetime
-                    next_close = datetime.fromisoformat(str(clock["next_close"]).replace("Z", "+00:00"))
-                    now = datetime.fromisoformat(str(clock["timestamp"]).replace("Z", "+00:00"))
+                    from datetime import datetime as _dt
+                    next_close = _dt.fromisoformat(str(clock["next_close"]).replace("Z", "+00:00"))
+                    now = _dt.fromisoformat(str(clock["timestamp"]).replace("Z", "+00:00"))
                     minutes_left = (next_close - now).total_seconds() / 60
+
+                    # Block new entries N minutes before close
+                    block_minutes = getattr(self.settings, "EOD_BLOCK_ENTRIES_MINUTES", 10)
+                    if minutes_left <= block_minutes:
+                        eod_block_entries = True
+                        if self._tick_count % 12 == 0:  # Log every ~60s
+                            logger.info(
+                                "EOD entry block: {} min until close — no new entries",
+                                int(minutes_left),
+                            )
+
+                    # Primary flatten (normal threshold)
+                    # Skip swing-exempt positions (they hold overnight)
                     if minutes_left <= self.settings.FLATTEN_MINUTES_BEFORE_CLOSE:
-                        logger.info("EOD flatten: {} min until close — closing all positions", int(minutes_left))
+                        logger.info("EOD flatten: {} min until close — closing day-trade positions", int(minutes_left))
                         if not self.settings.DRY_RUN and hasattr(self.exchange, 'close_all_positions'):
-                            await self.exchange.close_all_positions()
+                            await self._close_non_swing_positions()
+                            self._eod_flatten_done = True
                         if self.notifier:
                             await self.notifier.send_message(
-                                f"🏠 EOD flatten — closing all positions ({int(minutes_left)} min to close)"
+                                f"🏠 EOD flatten — closing day-trade positions ({int(minutes_left)} min to close)"
                             )
                         return
+
+                    # Failsafe flatten (FORCE_EOD_FLATTEN — hard guarantee)
+                    failsafe_min = getattr(self.settings, "EOD_FLATTEN_FAILSAFE_MINUTES", 2)
+                    if getattr(self.settings, "FORCE_EOD_FLATTEN", True) and minutes_left <= failsafe_min:
+                        if not self._eod_flatten_done:
+                            logger.warning(
+                                "EOD FAILSAFE: {} min to close — FORCE closing day-trade positions!",
+                                int(minutes_left),
+                            )
+                            if not self.settings.DRY_RUN and hasattr(self.exchange, 'close_all_positions'):
+                                await self._close_non_swing_positions()
+                                self._eod_flatten_done = True
+                            if self.notifier:
+                                await self.notifier.send_error_alert(
+                                    f"🚨 EOD FAILSAFE — force-closing all positions ({int(minutes_left)} min to close)"
+                                )
+                            return
             except Exception as exc:
                 logger.warning("EOD flatten check error: {}", exc)
+
+        # ── Circuit breaker check ─────────────────────────────────────────
+        circuit_breaker_active = False
+        if getattr(self.settings, "CIRCUIT_BREAKER_ENABLED", True):
+            circuit_breaker_active = self.risk.is_circuit_breaker_active
+            if circuit_breaker_active and self._tick_count % 12 == 0:
+                logger.info("Circuit breaker ACTIVE — blocking new entries")
 
         for symbol in self.settings.SYMBOLS:
             for strat in self.strategies:
                 try:
-                    await self._process_symbol(symbol, balances, strat)
+                    await self._process_symbol(
+                        symbol, balances, strat,
+                        block_entries=eod_block_entries or circuit_breaker_active,
+                    )
                 except Exception as exc:
                     logger.error("Error processing {} [{}]: {}", symbol, strat.name, exc)
 
@@ -266,7 +340,9 @@ class TradingEngine:
             await self._send_heartbeat()
 
     async def _process_symbol(
-        self, symbol: str, balances: dict[str, Decimal], strategy: BaseStrategy | None = None,
+        self, symbol: str, balances: dict[str, Decimal],
+        strategy: BaseStrategy | None = None,
+        block_entries: bool = False,
     ) -> None:
         """Process a single trading pair with a specific strategy in one tick."""
         # Use provided strategy or fall back to first (legacy)
@@ -284,8 +360,8 @@ class TradingEngine:
             min_score = getattr(self.settings, "SCANNER_MIN_EDGE_SCORE", 0)
             scan_result = self.scanner.get_symbol_scan(symbol)
             if scan_result and scan_result.edge_score < min_score:
-                logger.debug(
-                    "Scanner: {} score={:.0f} < min={:.0f} — skipping [{}]",
+                logger.info(
+                    "Scanner BLOCKED: {} score={:.0f} < min={:.0f} — skipping [{}]",
                     symbol, scan_result.edge_score, min_score, strat.name,
                 )
                 return
@@ -302,7 +378,7 @@ class TradingEngine:
         if self.strategy_selector:
             allowed, reason = self.strategy_selector.should_trade(strat.name)
             if not allowed:
-                logger.debug("Strategy selector: {} — {} [{}]", symbol, reason, strat.name)
+                logger.info("Strategy selector BLOCKED: {} — {} [{}]", symbol, reason, strat.name)
                 return
 
         # 1. Fetch current price
@@ -329,6 +405,26 @@ class TradingEngine:
 
         # 4 & 5. Validate and place orders
         for order in proposed_orders:
+            # Block new entry orders if EOD entry block or circuit breaker active
+            if block_entries and str(order.side).upper() in ("BUY", "SHORT"):
+                logger.debug(
+                    "Entry blocked (EOD/circuit breaker): {} {} {} [{}]",
+                    order.side, order.symbol, order.quantity, strat.name,
+                )
+                continue
+
+            # Gap filter: skip entries in the first N minutes after a big gap
+            if (
+                self._gap_filter_until
+                and datetime.now(timezone.utc) < self._gap_filter_until
+                and str(order.side).upper() in ("BUY", "SHORT")
+            ):
+                logger.debug(
+                    "Gap filter blocking entry: {} {} [{}]",
+                    order.side, order.symbol, strat.name,
+                )
+                continue
+
             # Apply regime size multiplier to BUY orders
             if self.strategy_selector and str(order.side).upper() in ("BUY", "SHORT"):
                 adjusted_qty = float(order.quantity) * self.strategy_selector.get_size_multiplier()
@@ -952,8 +1048,83 @@ class TradingEngine:
                     for col in ("open", "high", "low", "close", "volume"):
                         if col in spy_bars.columns:
                             spy_bars[col] = spy_bars[col].astype(float)
+
+                    # ── SPY open price + circuit breaker (v5 hardening) ──
+                    spy_close = float(spy_bars["close"].iloc[-1])
+
+                    # Set SPY open price once per day for circuit breaker
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    if today_str != self._last_market_day:
+                        self._last_market_day = today_str
+                        self._spy_open_set = False
+                        self._eod_flatten_done = False
+                        self._gap_filter_until = None
+
+                    if not self._spy_open_set:
+                        spy_open = float(spy_bars["open"].iloc[0])
+                        self.risk.update_spy_open(spy_open)
+                        self._spy_open_set = True
+                        logger.info("SPY open price set: {:.2f}", spy_open)
+
+                        # ── Gap filter: detect overnight gap ─────────
+                        if getattr(self.settings, "GAP_FILTER_ENABLED", True):
+                            gap_threshold = getattr(self.settings, "GAP_FILTER_SPY_THRESHOLD_PCT", 2.0)
+                            # Prev close is the close of bar[0], open is open of bar[0]
+                            # But more accurately, we check open vs previous session's last close
+                            # Use first bar's open vs close to approximate
+                            if len(spy_bars) >= 2:
+                                prev_close = float(spy_bars["close"].iloc[0])
+                                today_open = float(spy_bars["open"].iloc[1]) if len(spy_bars) > 1 else spy_open
+                                gap_pct = abs(today_open - prev_close) / prev_close * 100
+                                if gap_pct >= gap_threshold:
+                                    skip_min = getattr(self.settings, "GAP_FILTER_SKIP_MINUTES", 15)
+                                    from datetime import timedelta
+                                    self._gap_filter_until = datetime.now(timezone.utc) + timedelta(minutes=skip_min)
+                                    logger.warning(
+                                        "GAP FILTER: SPY gapped {:.1f}% overnight — "
+                                        "skipping entries for {} min (VWAP anchor unreliable)",
+                                        gap_pct, skip_min,
+                                    )
+
+                    # Circuit breaker check
+                    if getattr(self.settings, "CIRCUIT_BREAKER_ENABLED", True):
+                        was_active = self.risk.is_circuit_breaker_active
+                        now_active = self.risk.check_circuit_breaker(spy_close)
+                        if now_active and not was_active and self.notifier:
+                            await self.notifier.send_error_alert(
+                                f"🔴 CIRCUIT BREAKER — SPY crash detected. Pausing entries."
+                            )
+
+                    # ── ATR feed to risk manager (for adaptive stops) ──
+                    if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False):
+                        try:
+                            spy_atr = float(
+                                (spy_bars["high"] - spy_bars["low"]).tail(14).mean()
+                                / spy_bars["close"].iloc[-1] * 100
+                            )
+                            self.risk.update_symbol_atr("SPY", spy_atr)
+                        except Exception:
+                            pass
             except Exception:
                 pass
+
+            # ── Feed ATR for each trading symbol ──────────────────────
+            if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False):
+                for symbol in self.settings.SYMBOLS:
+                    try:
+                        import pandas as pd
+                        sym_bars_raw = await self.exchange.get_klines(symbol, "5m", 20)
+                        if sym_bars_raw and len(sym_bars_raw) >= 14:
+                            sym_df = pd.DataFrame(sym_bars_raw)
+                            for col in ("high", "low", "close"):
+                                sym_df[col] = sym_df[col].astype(float)
+                            atr_pct = float(
+                                (sym_df["high"] - sym_df["low"]).tail(14).mean()
+                                / sym_df["close"].iloc[-1] * 100
+                            )
+                            self.risk.update_symbol_atr(symbol, atr_pct)
+                    except Exception:
+                        pass
 
             regime = await self.regime_detector.update(
                 spy_bars=spy_bars,
@@ -1044,6 +1215,38 @@ class TradingEngine:
             await self.repository.save_bot_state(dashboard)
         except Exception as exc:
             logger.debug("Dashboard state save failed: {}", exc)
+
+    # ── Swing-aware position management ───────────────────────────────────────
+
+    def _get_swing_exempt_symbols(self) -> set[str]:
+        """Return symbols held by swing strategies (exempt from EOD flatten)."""
+        swing_symbols: set[str] = set()
+        for strat in self.strategies:
+            if getattr(strat, 'exempt_eod_flatten', False):
+                for sym, pos in strat.positions.items():
+                    if not pos.is_closed:
+                        swing_symbols.add(sym)
+        return swing_symbols
+
+    async def _close_non_swing_positions(self) -> None:
+        """Close all positions EXCEPT those held by swing strategies."""
+        swing_symbols = self._get_swing_exempt_symbols()
+        if not swing_symbols:
+            # No swing positions — use fast close_all
+            await self.exchange.close_all_positions()
+            return
+
+        positions = await self.exchange.get_positions() if hasattr(self.exchange, 'get_positions') else []
+        closed = 0
+        kept = 0
+        for p in positions:
+            if p['symbol'] in swing_symbols:
+                kept += 1
+                logger.info("EOD: Keeping swing position {} ({} shares)", p['symbol'], p['qty'])
+            else:
+                await self.exchange.close_position(p['symbol'])
+                closed += 1
+        logger.info("EOD flatten: closed {} day-trade positions, kept {} swing positions", closed, kept)
 
     # ── Stale order cleanup ───────────────────────────────────────────────────
 

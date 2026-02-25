@@ -24,6 +24,7 @@ from src.strategies.ema_pullback_strategy import EMAPullbackStrategy
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.orb_strategy import ORBStrategy
 from src.strategies.pairs_strategy import PairsTradingStrategy
+from src.strategies.swing_strategy import SwingStrategy
 from src.strategies.vwap_strategy import VWAPScalpStrategy
 from src.utils.logger import setup_logger
 
@@ -214,10 +215,30 @@ class AtoBot:
                     except Exception as exc:
                         logger.error("Error cancelling orders for {} ({}): {}", symbol, strategy.name, exc)
             # Flatten all positions on shutdown (day trading)
+            # Skip swing positions (they hold overnight by design)
             if hasattr(self.exchange, 'close_all_positions'):
                 try:
-                    await self.exchange.close_all_positions()
-                    logger.info("All positions flattened on shutdown")
+                    # Check if any strategy is swing (exempt from flatten)
+                    swing_symbols = set()
+                    for strategy in self.strategies:
+                        if getattr(strategy, 'exempt_eod_flatten', False):
+                            for sym, pos in strategy.positions.items():
+                                if not pos.is_closed:
+                                    swing_symbols.add(sym)
+
+                    if swing_symbols:
+                        # Close only non-swing positions
+                        positions = await self.exchange.get_positions()
+                        for p in positions:
+                            if p['symbol'] not in swing_symbols:
+                                await self.exchange.close_position(p['symbol'])
+                        logger.info(
+                            "Day-trade positions flattened on shutdown (kept {} swing positions)",
+                            len(swing_symbols),
+                        )
+                    else:
+                        await self.exchange.close_all_positions()
+                        logger.info("All positions flattened on shutdown")
                 except Exception as exc:
                     logger.error("Error flattening positions: {}", exc)
 
@@ -272,6 +293,7 @@ class AtoBot:
             "vwap_scalp": VWAPScalpStrategy,
             "ema_pullback": EMAPullbackStrategy,
             "pairs": PairsTradingStrategy,
+            "swing": SwingStrategy,
         }
         strategies = []
         for name in self.settings.STRATEGIES:

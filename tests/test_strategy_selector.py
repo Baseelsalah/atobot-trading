@@ -38,6 +38,7 @@ def mock_regime():
     rd.get_size_multiplier.return_value = 0.9
     regime = MagicMock()
     regime.direction = "both"
+    regime.preferred_direction = "both"
     regime.risk_on = True
     regime.trend = "trending_bullish"
     rd.get_current_regime.return_value = regime
