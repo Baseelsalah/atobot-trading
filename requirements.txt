@@ -9,6 +9,10 @@ aiohttp>=3.9,<4
 # ── AI / Intelligence ─────────────────────────────────────────────────────────
 openai>=1.12,<2  # AI-powered trade evaluation (optional, set OPENAI_API_KEY)
 
+# ── ML Model (Trade Prediction) ──────────────────────────────────────────────
+lightgbm>=4.0,<5           # Gradient boosting for trade win/loss prediction
+scikit-learn>=1.3,<2       # Metrics, calibration, utilities
+
 # ── Data / Indicators ────────────────────────────────────────────────────────
 pandas>=2.1,<3
 numpy>=1.26

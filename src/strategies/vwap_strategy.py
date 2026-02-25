@@ -147,12 +147,15 @@ class VWAPScalpStrategy(BaseStrategy):
             tp = Decimal(str(self.settings.VWAP_TAKE_PROFIT_PERCENT))
             sl = Decimal(str(self.settings.VWAP_STOP_LOSS_PERCENT))
 
+            # Determine exit side based on position direction
+            exit_side = OrderSide.SELL if pos.side == "LONG" else OrderSide.COVER
+
             # Trailing stop check (before fixed TP/SL)
             if self._check_trailing_stop(symbol, pos, current_price):
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -160,15 +163,19 @@ class VWAPScalpStrategy(BaseStrategy):
                 return orders
 
             # MACD death cross exit REMOVED in v3 (backtest proved it hurt avg win)
-            # VWAP mean-reversion doesn't need momentum confirmation to exit
 
-            # Take profit: price returned to VWAP (or above) or PnL target
-            price_above_vwap = current_price >= vwap
-            if price_above_vwap or pos.unrealized_pnl_percent >= tp:
+            # Take profit: price returned to VWAP (or PnL target)
+            if pos.side == "LONG":
+                tp_triggered = current_price >= vwap or pos.unrealized_pnl_percent >= tp
+            else:
+                # Short TP: price dropped back to VWAP (or below)
+                tp_triggered = current_price <= vwap or pos.unrealized_pnl_percent >= tp
+
+            if tp_triggered:
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -178,13 +185,13 @@ class VWAPScalpStrategy(BaseStrategy):
                     )
                 return orders
 
-            # Stop loss (ATR-based dynamic: uses per-position stop %)
+            # Stop loss (ATR-based dynamic)
             dynamic_sl = self._atr_stops.get(symbol, sl)
             if pos.unrealized_pnl_percent <= -dynamic_sl:
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -231,9 +238,10 @@ class VWAPScalpStrategy(BaseStrategy):
             quantity = round_quantity(quantity, filters["step_size"])
 
             if quantity > Decimal("0"):
+                entry_type, entry_price = self._entry_order_type_and_price(current_price, "BUY")
                 orders.append(Order(
                     symbol=symbol, side=OrderSide.BUY,
-                    order_type=OrderType.MARKET, price=current_price,
+                    order_type=entry_type, price=entry_price,
                     quantity=quantity, strategy=self.name,
                 ))
                 macd_str = f"MACD={macd_info['macd']:.4f}" if macd_info else "MACD=N/A"
@@ -243,8 +251,51 @@ class VWAPScalpStrategy(BaseStrategy):
                     symbol, current_price, vwap, deviation, macd_str, rsi_str,
                 )
         else:
-            # Log why no entry (every 60 ticks to avoid spam)
-            if symbol in self._signal_window and self._signal_window[symbol]["tick_count"] % 60 == 0:
+            # ── SHORT entry: price ABOVE VWAP (mean-reversion short) ─────
+            short_deviation = ((current_price - vwap) / vwap) * Decimal("100")
+            if (
+                getattr(self.settings, "SHORT_SELLING_ENABLED", False)
+                and short_deviation >= bounce_pct
+            ):
+                # Confluence gate
+                if not await self.passes_confluence_gate(symbol):
+                    pass  # Fall through to logging
+                else:
+                    # ATR-based dynamic stop for short
+                    dynamic_sl_pct = float(self.settings.VWAP_STOP_LOSS_PERCENT)
+                    if len(df) >= 15:
+                        tr = pd.concat([
+                            df['high'] - df['low'],
+                            (df['high'] - df['close'].shift(1)).abs(),
+                            (df['low'] - df['close'].shift(1)).abs()
+                        ], axis=1).max(axis=1)
+                        atr_14 = tr.rolling(14).mean().iloc[-1]
+                        if not pd.isna(atr_14):
+                            atr_pct = (atr_14 / float(current_price)) * 100
+                            baseline_sl = float(self.settings.VWAP_STOP_LOSS_PERCENT)
+                            dynamic_sl_pct = max(baseline_sl, min(0.50, atr_pct * 1.5))
+                    self._atr_stops[symbol] = Decimal(str(round(dynamic_sl_pct, 4)))
+
+                    quantity = await self.compute_dynamic_quantity(
+                        symbol, current_price,
+                        fallback_usd=self.settings.VWAP_ORDER_SIZE_USD,
+                        stop_loss_pct=dynamic_sl_pct,
+                    )
+                    quantity = round_quantity(quantity, filters["step_size"])
+
+                    if quantity > Decimal("0"):
+                        entry_type, entry_price = self._entry_order_type_and_price(current_price, "SHORT")
+                        orders.append(Order(
+                            symbol=symbol, side=OrderSide.SHORT,
+                            order_type=entry_type, price=entry_price,
+                            quantity=quantity, strategy=self.name,
+                        ))
+                        logger.info(
+                            "[VWAP] SHORT signal {} | price={} vwap={} dev={:.2f}%",
+                            symbol, current_price, vwap, short_deviation,
+                        )
+            elif symbol in self._signal_window and self._signal_window[symbol]["tick_count"] % 60 == 0:
+                # Log why no entry (every 60 ticks to avoid spam)
                 logger.info(
                     "[VWAP] No entry {} | price={} vwap={} dev={:.2f}% (need {:.2f}%)",
                     symbol, current_price, vwap, deviation, bounce_pct,
@@ -262,14 +313,23 @@ class VWAPScalpStrategy(BaseStrategy):
                     entry_price=order.price, current_price=order.price,
                     quantity=order.filled_quantity, strategy=self.name,
                 )
-                # Reset trailing high for new position
                 self._trailing_highs[symbol] = order.price
             else:
                 pos.add_to_position(order.price, order.filled_quantity)
-        elif order.side == OrderSide.SELL:
+        elif order.side == OrderSide.SHORT:
+            pos = self.positions.get(symbol)
+            if pos is None or pos.is_closed:
+                self.positions[symbol] = Position(
+                    symbol=symbol, side="SHORT",
+                    entry_price=order.price, current_price=order.price,
+                    quantity=order.filled_quantity, strategy=self.name,
+                )
+                self._trailing_highs[symbol] = order.price
+            else:
+                pos.add_to_position(order.price, order.filled_quantity)
+        elif order.side in (OrderSide.SELL, OrderSide.COVER):
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
-                # Track win/loss for progressive risk scaling (v5)
                 pnl = pos.unrealized_pnl
                 pos.reduce_position(order.filled_quantity, order.price)
                 if pos.is_closed:
@@ -279,7 +339,7 @@ class VWAPScalpStrategy(BaseStrategy):
                         self.record_loss()
             if pos and pos.is_closed:
                 self._reset_trailing_high(symbol)
-                self._atr_stops.pop(symbol, None)  # Clean up ATR stop (v7)
+                self._atr_stops.pop(symbol, None)
 
         self.active_orders = [
             o for o in self.active_orders if o.internal_id != order.internal_id

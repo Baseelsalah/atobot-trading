@@ -330,7 +330,7 @@ class TradingEngine:
         # 4 & 5. Validate and place orders
         for order in proposed_orders:
             # Apply regime size multiplier to BUY orders
-            if self.strategy_selector and str(order.side).upper() == "BUY":
+            if self.strategy_selector and str(order.side).upper() in ("BUY", "SHORT"):
                 adjusted_qty = float(order.quantity) * self.strategy_selector.get_size_multiplier()
                 weight = self.strategy_selector.get_strategy_weight(strat.name)
                 adjusted_qty *= weight
@@ -354,7 +354,7 @@ class TradingEngine:
             if (
                 self.ai_advisor
                 and self.ai_advisor._enabled
-                and str(order.side).upper() == "BUY"
+                and str(order.side).upper() in ("BUY", "SHORT")
             ):
                 try:
                     indicators_data = {}
@@ -487,10 +487,10 @@ class TradingEngine:
                         should_fill = True
                     # Limit buys fill when price <= limit, sells when price >= limit
                     elif str(order.order_type).upper() == "LIMIT":
-                        if str(order.side).upper() == "BUY" and current_price <= order.price:
+                        if str(order.side).upper() in ("BUY", "COVER") and current_price <= order.price:
                             should_fill = True
                             fill_price = order.price  # Limit fills at limit price
-                        elif str(order.side).upper() == "SELL" and current_price >= order.price:
+                        elif str(order.side).upper() in ("SELL", "SHORT") and current_price >= order.price:
                             should_fill = True
                             fill_price = order.price
 
@@ -505,12 +505,14 @@ class TradingEngine:
                         fill_price, order.quantity, strat.name,
                     )
 
-                    # Compute PnL for sell orders
+                    # Compute PnL for closing orders (SELL closes long, COVER closes short)
                     trade_pnl = None
                     pos = strat.positions.get(symbol)
-                    if str(order.side).upper() == "SELL" and pos and not pos.is_closed:
+                    order_side_upper = str(order.side).upper()
+                    if order_side_upper in ("SELL", "COVER") and pos and not pos.is_closed:
+                        position_side = "SHORT" if order_side_upper == "COVER" else "BUY"
                         trade_pnl = calculate_pnl(
-                            pos.entry_price, fill_price, order.quantity, "BUY"
+                            pos.entry_price, fill_price, order.quantity, position_side
                         )
 
                     trade = Trade(
@@ -562,12 +564,14 @@ class TradingEngine:
                         filled_qty,
                     )
 
-                    # Compute PnL for sell orders (Fix #2)
+                    # Compute PnL for closing orders (SELL closes long, COVER closes short)
                     trade_pnl = None
                     pos = strat.positions.get(order.symbol)
-                    if str(order.side).upper() == "SELL" and pos and not pos.is_closed:
+                    order_side_upper = str(order.side).upper()
+                    if order_side_upper in ("SELL", "COVER") and pos and not pos.is_closed:
+                        position_side = "SHORT" if order_side_upper == "COVER" else "BUY"
                         trade_pnl = calculate_pnl(
-                            pos.entry_price, fill_price, filled_qty, "BUY"
+                            pos.entry_price, fill_price, filled_qty, position_side
                         )
 
                     # Create trade record with actual fill price
@@ -637,9 +641,11 @@ class TradingEngine:
 
                         trade_pnl = None
                         pos = strat.positions.get(order.symbol)
-                        if str(order.side).upper() == "SELL" and pos and not pos.is_closed:
+                        order_side_upper = str(order.side).upper()
+                        if order_side_upper in ("SELL", "COVER") and pos and not pos.is_closed:
+                            position_side = "SHORT" if order_side_upper == "COVER" else "BUY"
                             trade_pnl = calculate_pnl(
-                                pos.entry_price, fill_price, new_fill, "BUY"
+                                pos.entry_price, fill_price, new_fill, position_side
                             )
 
                         trade = Trade(
@@ -736,9 +742,11 @@ class TradingEngine:
 
                     trade_pnl = None
                     pos = matched_strat.positions.get(symbol)
-                    if str(matched_order.side).upper() == "SELL" and pos and not pos.is_closed:
+                    order_side_upper = str(matched_order.side).upper()
+                    if order_side_upper in ("SELL", "COVER") and pos and not pos.is_closed:
+                        position_side = "SHORT" if order_side_upper == "COVER" else "BUY"
                         trade_pnl = calculate_pnl(
-                            pos.entry_price, fill_price, filled_qty, "BUY"
+                            pos.entry_price, fill_price, filled_qty, position_side
                         )
 
                     trade = Trade(
@@ -792,9 +800,11 @@ class TradingEngine:
 
                         trade_pnl = None
                         pos = matched_strat.positions.get(symbol)
-                        if str(matched_order.side).upper() == "SELL" and pos and not pos.is_closed:
+                        order_side_upper = str(matched_order.side).upper()
+                        if order_side_upper in ("SELL", "COVER") and pos and not pos.is_closed:
+                            position_side = "SHORT" if order_side_upper == "COVER" else "BUY"
                             trade_pnl = calculate_pnl(
-                                pos.entry_price, fill_price, new_fill, "BUY"
+                                pos.entry_price, fill_price, new_fill, position_side
                             )
 
                         trade = Trade(
@@ -964,7 +974,7 @@ class TradingEngine:
             logger.debug("Regime update error: {}", exc)
 
     async def _send_heartbeat(self) -> None:
-        """Send a periodic status update."""
+        """Send a periodic status update and save dashboard state."""
         try:
             all_status = {}
             for strat in self.strategies:
@@ -988,8 +998,52 @@ class TradingEngine:
                         f"PnL={status.get('unrealized_pnl', 'N/A')}"
                     )
                 await self.notifier.send_message("\n".join(lines))
+
+            # Save enriched state for dashboard
+            await self._save_dashboard_state(all_status)
         except Exception as exc:
             logger.warning("Heartbeat failed: {}", exc)
+
+    async def _save_dashboard_state(self, strategies_status: dict) -> None:
+        """Persist risk / ML / pairs state so the Streamlit dashboard can read it."""
+        if not self.repository:
+            return
+        try:
+            dashboard: dict = {"strategies_status": strategies_status}
+
+            # Risk state
+            dashboard["risk_state"] = {
+                "is_halted": self.risk.is_halted,
+                "halt_reason": getattr(self.risk, "halt_reason", ""),
+                "balance": str(getattr(self.risk, "current_balance", 0)),
+                "daily_pnl": str(getattr(self.risk, "daily_pnl", 0)),
+            }
+            if hasattr(self.risk, "current_var"):
+                dashboard["risk_state"]["var"] = self.risk.current_var()
+
+            # Correlation penalties
+            if self.position_sizer and hasattr(self.position_sizer, "_correlation_penalties"):
+                dashboard["correlation_penalties"] = dict(self.position_sizer._correlation_penalties)
+
+            # Pairs state
+            for strat in self.strategies:
+                if hasattr(strat, "get_pair_states"):
+                    dashboard["pairs_state"] = strat.get_pair_states()
+                    break
+
+            # ML model state
+            for strat in self.strategies:
+                if hasattr(strat, "_ml_model") and strat._ml_model is not None:
+                    dashboard["ml_state"] = strat._ml_model.get_stats()
+                    try:
+                        dashboard["ml_state"]["feature_importance"] = strat._ml_model.get_feature_importance()
+                    except Exception:
+                        pass
+                    break
+
+            await self.repository.save_bot_state(dashboard)
+        except Exception as exc:
+            logger.debug("Dashboard state save failed: {}", exc)
 
     # ── Stale order cleanup ───────────────────────────────────────────────────
 

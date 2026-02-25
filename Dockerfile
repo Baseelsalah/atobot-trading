@@ -3,6 +3,11 @@ FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
+# Build deps for LightGBM (needs gcc + cmake)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ cmake libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
@@ -10,6 +15,10 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.14-slim
 
 WORKDIR /app
+
+# Runtime dep: libgomp (OpenMP for LightGBM)
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local

@@ -72,13 +72,16 @@ class MomentumStrategy(BaseStrategy):
             tp = Decimal(str(self.settings.MOMENTUM_TAKE_PROFIT_PERCENT))
             sl = Decimal(str(self.settings.MOMENTUM_STOP_LOSS_PERCENT))
 
+            # Determine exit side based on position direction
+            exit_side = OrderSide.SELL if pos.side == "LONG" else OrderSide.COVER
+
             # Trailing stop check (before fixed TP/SL)
             if self._check_trailing_stop(symbol, pos, current_price):
                 sell_qty = round_quantity(pos.quantity, filters["step_size"])
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -92,7 +95,7 @@ class MomentumStrategy(BaseStrategy):
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -109,7 +112,7 @@ class MomentumStrategy(BaseStrategy):
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -136,7 +139,7 @@ class MomentumStrategy(BaseStrategy):
                             if sell_qty > Decimal("0"):
                                 orders.append(Order(
                                     symbol=symbol,
-                                    side=OrderSide.SELL,
+                                    side=exit_side,
                                     order_type=OrderType.MARKET,
                                     price=current_price,
                                     quantity=sell_qty,
@@ -235,6 +238,49 @@ class MomentumStrategy(BaseStrategy):
                         current_vol / avg_vol if avg_vol else 0,
                     )
 
+            # ── SHORT entry: RSI overbought + bearish MACD + volume ──────
+            elif getattr(self.settings, "SHORT_SELLING_ENABLED", False):
+                rsi_short = current_rsi >= self.settings.MOMENTUM_RSI_OVERBOUGHT
+                if len(rsi_series) >= 2:
+                    prev_rsi = rsi_series.iloc[-2]
+                    rsi_cross_down = prev_rsi >= self.settings.MOMENTUM_RSI_OVERBOUGHT and current_rsi < prev_rsi
+                else:
+                    rsi_cross_down = False
+
+                macd_bearish = False
+                if len(df) >= 35:
+                    try:
+                        macd_info = indicators.macd_signal(df)
+                        macd_bearish = not macd_info["bullish"] or macd_info.get("death_cross", False)
+                    except Exception:
+                        pass
+
+                if (rsi_short or rsi_cross_down) and vol_ok and macd_bearish:
+                    if not await self.passes_confluence_gate(symbol):
+                        return orders
+
+                    quantity = await self.compute_dynamic_quantity(
+                        symbol, current_price,
+                        fallback_usd=self.settings.BASE_ORDER_SIZE_USD,
+                        stop_loss_pct=self.settings.MOMENTUM_STOP_LOSS_PERCENT,
+                    )
+                    quantity = round_quantity(quantity, filters["step_size"])
+
+                    if quantity > Decimal("0"):
+                        orders.append(Order(
+                            symbol=symbol,
+                            side=OrderSide.SHORT,
+                            order_type=OrderType.MARKET,
+                            price=current_price,
+                            quantity=quantity,
+                            strategy=self.name,
+                        ))
+                        logger.info(
+                            "[Momentum] SHORT signal {} | RSI={:.1f} vol_ratio={:.1f}x",
+                            symbol, current_rsi,
+                            current_vol / avg_vol if avg_vol else 0,
+                        )
+
         except Exception as exc:
             logger.warning("[Momentum] Data fetch error for {}: {}", symbol, exc)
 
@@ -253,10 +299,20 @@ class MomentumStrategy(BaseStrategy):
                 self._trailing_highs[symbol] = order.price
             else:
                 pos.add_to_position(order.price, order.filled_quantity)
-        elif order.side == OrderSide.SELL:
+        elif order.side == OrderSide.SHORT:
+            pos = self.positions.get(symbol)
+            if pos is None or pos.is_closed:
+                self.positions[symbol] = Position(
+                    symbol=symbol, side="SHORT",
+                    entry_price=order.price, current_price=order.price,
+                    quantity=order.filled_quantity, strategy=self.name,
+                )
+                self._trailing_highs[symbol] = order.price
+            else:
+                pos.add_to_position(order.price, order.filled_quantity)
+        elif order.side in (OrderSide.SELL, OrderSide.COVER):
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
-                # Track win/loss for progressive risk scaling (v5)
                 pnl = pos.unrealized_pnl
                 pos.reduce_position(order.filled_quantity, order.price)
                 if pos.is_closed:

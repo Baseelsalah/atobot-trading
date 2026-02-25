@@ -23,6 +23,7 @@ from src.strategies.base_strategy import BaseStrategy
 from src.strategies.ema_pullback_strategy import EMAPullbackStrategy
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.orb_strategy import ORBStrategy
+from src.strategies.pairs_strategy import PairsTradingStrategy
 from src.strategies.vwap_strategy import VWAPScalpStrategy
 from src.utils.logger import setup_logger
 
@@ -270,6 +271,7 @@ class AtoBot:
             "orb": ORBStrategy,
             "vwap_scalp": VWAPScalpStrategy,
             "ema_pullback": EMAPullbackStrategy,
+            "pairs": PairsTradingStrategy,
         }
         strategies = []
         for name in self.settings.STRATEGIES:

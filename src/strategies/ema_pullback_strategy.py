@@ -95,13 +95,16 @@ class EMAPullbackStrategy(BaseStrategy):
             tp = Decimal(str(self.settings.EMA_PULLBACK_TAKE_PROFIT_PERCENT))
             sl = Decimal(str(self.settings.EMA_PULLBACK_STOP_LOSS_PERCENT))
 
+            # Determine exit side based on position direction
+            exit_side = OrderSide.SELL if pos.side == "LONG" else OrderSide.COVER
+
             # Trailing stop (primary exit — lets trends run)
             if self._check_trailing_stop(symbol, pos, current_price):
                 sell_qty = round_quantity(pos.quantity, filters["step_size"])
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -119,7 +122,7 @@ class EMAPullbackStrategy(BaseStrategy):
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -137,7 +140,7 @@ class EMAPullbackStrategy(BaseStrategy):
                 if sell_qty > Decimal("0"):
                     orders.append(Order(
                         symbol=symbol,
-                        side=OrderSide.SELL,
+                        side=exit_side,
                         order_type=OrderType.MARKET,
                         price=current_price,
                         quantity=sell_qty,
@@ -164,7 +167,7 @@ class EMAPullbackStrategy(BaseStrategy):
                             if sell_qty > Decimal("0"):
                                 orders.append(Order(
                                     symbol=symbol,
-                                    side=OrderSide.SELL,
+                                    side=exit_side,
                                     order_type=OrderType.MARKET,
                                     price=current_price,
                                     quantity=sell_qty,
@@ -287,7 +290,18 @@ class EMAPullbackStrategy(BaseStrategy):
                 self._trailing_highs[symbol] = order.price
             else:
                 pos.add_to_position(order.price, order.filled_quantity)
-        elif order.side == OrderSide.SELL:
+        elif order.side == OrderSide.SHORT:
+            pos = self.positions.get(symbol)
+            if pos is None or pos.is_closed:
+                self.positions[symbol] = Position(
+                    symbol=symbol, side="SHORT",
+                    entry_price=order.price, current_price=order.price,
+                    quantity=order.filled_quantity, strategy=self.name,
+                )
+                self._trailing_highs[symbol] = order.price
+            else:
+                pos.add_to_position(order.price, order.filled_quantity)
+        elif order.side in (OrderSide.SELL, OrderSide.COVER):
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
                 # Track win/loss for progressive risk scaling (v5)

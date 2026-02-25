@@ -97,6 +97,7 @@ class PositionSizer:
         self._trade_history: list[TradeRecord] = []
         self._open_positions: dict[str, dict] = {}  # symbol -> {qty, risk$}
         self._sector_exposure: dict[str, float] = {}  # sector -> notional$
+        self._correlation_penalties: dict[str, float] = {}  # symbol -> scale 0-1
 
     # ── Core Sizing ───────────────────────────────────────────────────────────
 
@@ -179,6 +180,13 @@ class PositionSizer:
             if sector_pct >= self.max_sector_concentration:
                 notes.append(f"Sector {sector} at {sector_pct:.1%} — max reached")
                 base_qty = 0
+
+        # ── Step 6b: Correlation-adjusted size reduction ──────────────────
+        if self._correlation_penalties and symbol in self._correlation_penalties:
+            penalty = self._correlation_penalties[symbol]
+            if penalty < 1.0:
+                base_qty *= penalty
+                notes.append(f"Correlation penalty ×{penalty:.2f}")
 
         # ── Step 7: Regime multiplier ─────────────────────────────────────
         if self.regime_multiplier != 1.0:
@@ -389,7 +397,21 @@ class PositionSizer:
             result[s] = self.expectancy(strategy=s)
         return result
 
+    def update_correlation_penalties(
+        self, penalties: dict[str, float]
+    ) -> None:
+        """Set per-symbol sizing penalties based on portfolio correlation.
+
+        Args:
+            penalties: mapping of symbol → multiplier (0.0–1.0).
+                       e.g. {"NVDA": 0.6} means size for NVDA is reduced to 60%.
+        """
+        self._correlation_penalties = penalties
+        if penalties:
+            logger.debug("Correlation penalties updated: {}", penalties)
+
     def reset_daily(self) -> None:
         """Reset daily state (keep trade history)."""
         self._open_positions.clear()
         self._sector_exposure.clear()
+        self._correlation_penalties.clear()

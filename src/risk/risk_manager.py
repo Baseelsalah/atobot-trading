@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
+import numpy as np
 from loguru import logger
 
 from src.config.settings import Settings
@@ -27,6 +29,13 @@ class RiskManager:
         self._daily_trade_count: int = 0
         self._daily_wins: int = 0
         self._last_reset_date: datetime = datetime.now(timezone.utc)
+
+        # Correlation risk — daily returns cache: symbol -> np.array of returns
+        self._returns_cache: dict[str, np.ndarray] = {}
+        self._correlation_matrix: dict[tuple[str, str], float] = {}
+
+        # VaR — portfolio daily returns history
+        self._portfolio_returns: list[float] = []
 
     # ── Pre-trade checks ──────────────────────────────────────────────────────
 
@@ -99,6 +108,20 @@ class RiskManager:
                     f"Daily trade limit reached: {self._daily_trade_count} "
                     f"(max: {self.settings.MAX_DAILY_TRADES})"
                 )
+
+        # 9. Correlation-based exposure limit
+        if getattr(self.settings, "CORRELATION_RISK_ENABLED", False):
+            corr_ok, corr_reason = self._check_correlation_exposure(
+                order.symbol, float(notional)
+            )
+            if not corr_ok:
+                return False, corr_reason
+
+        # 10. Value-at-Risk check
+        if getattr(self.settings, "VAR_ENABLED", False):
+            var_ok, var_reason = self._check_var(float(notional))
+            if not var_ok:
+                return False, var_reason
 
         return True, ""
 
@@ -196,7 +219,151 @@ class RiskManager:
         self.halt_reason = ""
         logger.info("Trading resumed")
 
+    # ── Correlation Risk ────────────────────────────────────────────────────
+
+    def update_returns_cache(
+        self, symbol: str, daily_returns: list[float] | np.ndarray
+    ) -> None:
+        """Store daily returns for a symbol (called from engine after fetching OHLCV)."""
+        self._returns_cache[symbol] = np.array(daily_returns, dtype=float)
+
+    def _check_correlation_exposure(
+        self, new_symbol: str, new_notional: float
+    ) -> tuple[bool, str]:
+        """Block if adding this symbol would breach correlated-exposure limit.
+
+        For every open position whose Pearson r with *new_symbol* exceeds
+        CORRELATION_THRESHOLD, sum their notionals + the new trade's notional.
+        If that sum exceeds MAX_CORRELATED_EXPOSURE × account, reject.
+        """
+        threshold = getattr(self.settings, "CORRELATION_THRESHOLD", 0.70)
+        max_pct = getattr(self.settings, "MAX_CORRELATED_EXPOSURE", 0.40)
+        if self.current_balance <= 0:
+            return True, ""
+
+        account = float(self.current_balance)
+        max_usd = account * max_pct
+
+        # Gather notionals of correlated open positions
+        correlated_notional = new_notional
+        new_ret = self._returns_cache.get(new_symbol)
+        if new_ret is None or len(new_ret) < 10:
+            # Not enough data to compute correlation — allow trade
+            return True, ""
+
+        from src.risk.position_sizer import PositionSizer  # avoid circular at module level
+
+        for sym, pos_info in list(self._open_positions_snapshot.items()):
+            if sym == new_symbol:
+                continue
+            cached_ret = self._returns_cache.get(sym)
+            if cached_ret is None or len(cached_ret) < 10:
+                continue
+            # Align lengths
+            n = min(len(new_ret), len(cached_ret))
+            r = np.corrcoef(new_ret[-n:], cached_ret[-n:])[0, 1]
+            if math.isnan(r):
+                continue
+            if abs(r) >= threshold:
+                correlated_notional += pos_info.get("notional", 0.0)
+
+        if correlated_notional > max_usd:
+            return False, (
+                f"Correlated exposure ${correlated_notional:,.0f} would exceed "
+                f"limit ${max_usd:,.0f} ({max_pct:.0%} of ${account:,.0f})"
+            )
+        return True, ""
+
+    def set_open_positions_snapshot(
+        self, positions: dict[str, dict]
+    ) -> None:
+        """Receive open-positions map from PositionSizer for correlation checks."""
+        self._open_positions_snapshot = positions
+
+    # ── Value-at-Risk ─────────────────────────────────────────────────────────
+
+    def record_portfolio_return(self, daily_return_pct: float) -> None:
+        """Append one daily portfolio return (e.g. 0.012 = +1.2%)."""
+        self._portfolio_returns.append(daily_return_pct)
+        # Keep last 252 trading days
+        if len(self._portfolio_returns) > 252:
+            self._portfolio_returns = self._portfolio_returns[-252:]
+
+    def _check_var(self, new_notional: float) -> tuple[bool, str]:
+        """Block trade if adding it would push daily VaR above limit.
+
+        Uses historical VaR on portfolio returns.  If insufficient history,
+        allows trade (conservative bootstrap phase).
+        """
+        lookback = getattr(self.settings, "VAR_LOOKBACK_DAYS", 30)
+        confidence = getattr(self.settings, "VAR_CONFIDENCE", 0.95)
+        max_var_pct = getattr(self.settings, "VAR_MAX_PORTFOLIO_PCT", 0.03)
+
+        if len(self._portfolio_returns) < lookback:
+            return True, ""  # Not enough data yet
+
+        account = float(self.current_balance) if self.current_balance > 0 else 1.0
+        returns = np.array(self._portfolio_returns[-lookback:])
+
+        method = getattr(self.settings, "VAR_METHOD", "historical")
+        if method == "parametric":
+            # Gaussian VaR
+            from scipy.stats import norm  # lightweight import
+            mu = float(np.mean(returns))
+            sigma = float(np.std(returns, ddof=1))
+            if sigma == 0:
+                return True, ""
+            z = norm.ppf(1 - confidence)
+            var_pct = -(mu + z * sigma)
+        else:
+            # Historical VaR — percentile of losses
+            var_pct = float(-np.percentile(returns, (1 - confidence) * 100))
+
+        if var_pct < 0:
+            var_pct = 0.0  # No risk? Allow.
+
+        if var_pct > max_var_pct:
+            var_usd = var_pct * account
+            limit_usd = max_var_pct * account
+            return False, (
+                f"Portfolio VaR {var_pct:.2%} (${var_usd:,.0f}) exceeds limit "
+                f"{max_var_pct:.2%} (${limit_usd:,.0f})"
+            )
+        return True, ""
+
+    def current_var(self) -> dict:
+        """Return current VaR metrics (for dashboard / logging)."""
+        lookback = getattr(self.settings, "VAR_LOOKBACK_DAYS", 30)
+        confidence = getattr(self.settings, "VAR_CONFIDENCE", 0.95)
+        account = float(self.current_balance) if self.current_balance > 0 else 0.0
+
+        if len(self._portfolio_returns) < lookback:
+            return {"var_pct": None, "var_usd": None, "es_pct": None, "data_days": len(self._portfolio_returns)}
+
+        returns = np.array(self._portfolio_returns[-lookback:])
+        cutoff = (1 - confidence) * 100
+        var_pct = float(-np.percentile(returns, cutoff))
+        # Expected shortfall (CVaR) — average of losses beyond VaR
+        tail = returns[returns <= -var_pct]
+        es_pct = float(-np.mean(tail)) if len(tail) > 0 else var_pct
+
+        return {
+            "var_pct": round(var_pct, 5),
+            "var_usd": round(var_pct * account, 2),
+            "es_pct": round(es_pct, 5),
+            "es_usd": round(es_pct * account, 2),
+            "data_days": len(self._portfolio_returns),
+        }
+
     # ── Internal ──────────────────────────────────────────────────────────────
+
+    @property
+    def _open_positions_snapshot(self) -> dict[str, dict]:
+        return getattr(self, "_positions_snap", {})
+
+    @_open_positions_snapshot.setter
+    def _open_positions_snapshot(self, value: dict[str, dict]) -> None:
+        self._positions_snap = value
 
     def _maybe_reset_daily(self) -> None:
         """Reset daily PnL and trade count if a new UTC day has started."""

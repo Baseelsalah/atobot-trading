@@ -199,37 +199,84 @@ class BaseStrategy(ABC):
     def _check_trailing_stop(
         self, symbol: str, pos: Position, current_price: Decimal
     ) -> bool:
-        """Return True if trailing stop triggered. Updates highest price tracker."""
+        """Return True if trailing stop triggered. Updates highest/lowest price tracker."""
         if not self.settings.TRAILING_STOP_ENABLED:
             return False
-
-        # Track highest price since entry
-        prev_high = self._trailing_highs.get(symbol, pos.entry_price)
-        if current_price > prev_high:
-            self._trailing_highs[symbol] = current_price
-            prev_high = current_price
 
         activation = Decimal(str(self.settings.TRAILING_STOP_ACTIVATION_PCT))
         distance = Decimal(str(self.settings.TRAILING_STOP_DISTANCE_PCT))
 
-        # Only activate after minimum profit threshold
-        profit_pct = ((prev_high - pos.entry_price) / pos.entry_price) * Decimal("100")
-        if profit_pct < activation:
-            return False
+        if pos.side == "SHORT":
+            # For shorts: track lowest price since entry, trigger if price rises
+            prev_low = self._trailing_highs.get(symbol, pos.entry_price)
+            if current_price < prev_low:
+                self._trailing_highs[symbol] = current_price
+                prev_low = current_price
 
-        # Trailing stop: price has fallen distance% from the high
-        trail_stop_price = prev_high * (Decimal("1") - distance / Decimal("100"))
-        if current_price <= trail_stop_price:
-            logger.info(
-                "[{}] TRAILING STOP {} | price={} < trail={} (high={})",
-                self.name, symbol, current_price, trail_stop_price, prev_high,
-            )
-            return True
+            # Profit for short = entry dropped
+            profit_pct = ((pos.entry_price - prev_low) / pos.entry_price) * Decimal("100")
+            if profit_pct < activation:
+                return False
+
+            trail_stop_price = prev_low * (Decimal("1") + distance / Decimal("100"))
+            if current_price >= trail_stop_price:
+                logger.info(
+                    "[{}] TRAILING STOP (short) {} | price={} > trail={} (low={})",
+                    self.name, symbol, current_price, trail_stop_price, prev_low,
+                )
+                return True
+        else:
+            # For longs: track highest price since entry
+            prev_high = self._trailing_highs.get(symbol, pos.entry_price)
+            if current_price > prev_high:
+                self._trailing_highs[symbol] = current_price
+                prev_high = current_price
+
+            profit_pct = ((prev_high - pos.entry_price) / pos.entry_price) * Decimal("100")
+            if profit_pct < activation:
+                return False
+
+            trail_stop_price = prev_high * (Decimal("1") - distance / Decimal("100"))
+            if current_price <= trail_stop_price:
+                logger.info(
+                    "[{}] TRAILING STOP {} | price={} < trail={} (high={})",
+                    self.name, symbol, current_price, trail_stop_price, prev_high,
+                )
+                return True
         return False
 
     def _reset_trailing_high(self, symbol: str) -> None:
         """Reset trailing high when position is closed."""
         self._trailing_highs.pop(symbol, None)
+
+    # ── Limit Order Entry Helper ──────────────────────────────────────────────
+
+    def _entry_order_type_and_price(
+        self, signal_price: Decimal, side: str,
+    ) -> tuple:
+        """Determine order type and price for entries.
+
+        If LIMIT_ENTRY_ENABLED, returns LIMIT order with a small offset
+        from the signal price for better fills. Otherwise returns MARKET.
+
+        Returns:
+            (OrderType, Decimal): order type and limit price
+        """
+        from src.models.order import OrderType
+        if not getattr(self.settings, "LIMIT_ENTRY_ENABLED", False):
+            return OrderType.MARKET, signal_price
+
+        offset_pct = Decimal(str(getattr(self.settings, "LIMIT_OFFSET_PCT", 0.02)))
+        offset = signal_price * offset_pct / Decimal("100")
+
+        if side.upper() in ("BUY", "COVER"):
+            # For buys/covers: limit slightly below current price
+            limit_price = signal_price - offset
+        else:
+            # For shorts/sells: limit slightly above current price
+            limit_price = signal_price + offset
+
+        return OrderType.LIMIT, limit_price
 
     # ── ATR-based position sizing ─────────────────────────────────────────────
 

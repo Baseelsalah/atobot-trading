@@ -550,4 +550,4 @@ class TestNewSettings:
         )
         assert s.ATR_SIZING_ENABLED is False
         assert s.ATR_SIZING_PERIOD == 14
-        assert s.ATR_RISK_DOLLARS == 50.0
+        assert s.ATR_RISK_DOLLARS == 500.0

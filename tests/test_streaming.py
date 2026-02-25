@@ -312,7 +312,7 @@ async def test_settings_streaming_defaults() -> None:
         assert settings.STREAMING_ENABLED is True
         assert settings.TRADE_STREAM_ENABLED is True
         assert settings.NEWS_STREAM_ENABLED is False
-        assert settings.DATA_FEED == "iex"
+        assert settings.DATA_FEED == "sip"
 
 
 @pytest.mark.asyncio

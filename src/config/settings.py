@@ -34,16 +34,16 @@ class Settings(BaseSettings):
     STREAMING_ENABLED: bool = True  # Real-time price stream via StockDataStream
     TRADE_STREAM_ENABLED: bool = True  # Instant order fill/reject via TradingStream
     NEWS_STREAM_ENABLED: bool = False  # Real-time news via NewsDataStream
-    DATA_FEED: str = "iex"  # "iex" (free) or "sip" (paid SIP consolidated)
+    DATA_FEED: str = "sip"  # "sip" (paid SIP consolidated, best fills) or "iex" (free)
 
     # ── Trading ───────────────────────────────────────────────────────────────
     SYMBOLS: list[str] = ["AAPL", "MSFT", "TSLA", "NVDA", "AMD",
                           "META", "GOOGL", "AMZN", "AVGO", "NFLX",
                           "SPY", "QQQ", "CRM", "UBER", "MU"]
     DEFAULT_STRATEGY: str = "vwap_scalp"  # VWAP is strongest strategy per backtest
-    STRATEGIES: list[str] = []  # Run multiple: ["vwap_scalp", "ema_pullback", "momentum"]
-    BASE_ORDER_SIZE_USD: float = 500.0  # Base dollar amount per trade
-    MAX_OPEN_ORDERS: int = 10
+    STRATEGIES: list[str] = ["vwap_scalp", "ema_pullback", "momentum"]  # Multi-strategy default
+    BASE_ORDER_SIZE_USD: float = 5000.0  # Scaled from $500 for real returns
+    MAX_OPEN_ORDERS: int = 15
     FRACTIONAL_SHARES: bool = True  # Alpaca supports fractional shares
 
     # ── Market Hours ──────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     ORB_BREAKOUT_PERCENT: float = 0.15  # % above range to confirm (backtest v3: 0.15)
     ORB_TAKE_PROFIT_PERCENT: float = 1.5  # Single TP (no brackets in v3)
     ORB_STOP_LOSS_PERCENT: float = 0.75  # Proven via backtest (0.50 too tight)
-    ORB_ORDER_SIZE_USD: float = 500.0
+    ORB_ORDER_SIZE_USD: float = 5000.0
 
     # ── EMA Pullback Strategy ─────────────────────────────────────────────────
     EMA_PULLBACK_FAST_PERIOD: int = 9     # Fast EMA for signal (9-bar)
@@ -78,13 +78,13 @@ class Settings(BaseSettings):
     EMA_PULLBACK_VOLUME_MULTIPLIER: float = 1.2  # Min relative volume
     EMA_PULLBACK_TAKE_PROFIT_PERCENT: float = 1.5  # TP %
     EMA_PULLBACK_STOP_LOSS_PERCENT: float = 0.75  # SL %
-    EMA_PULLBACK_ORDER_SIZE_USD: float = 500.0
+    EMA_PULLBACK_ORDER_SIZE_USD: float = 5000.0
 
     # ── VWAP Scalp Strategy ───────────────────────────────────────────────────
     VWAP_BOUNCE_PERCENT: float = 0.10  # backtest v2: 0.10% = +$11K vs 0.05% over-trading
     VWAP_TAKE_PROFIT_PERCENT: float = 0.5
     VWAP_STOP_LOSS_PERCENT: float = 0.30  # backtest v2: 0.30% optimal (was 0.50)
-    VWAP_ORDER_SIZE_USD: float = 500.0
+    VWAP_ORDER_SIZE_USD: float = 5000.0
 
     # ── Trend Filter (EMA) ────────────────────────────────────────────────────
     TREND_FILTER_ENABLED: bool = False  # Backtest showed EMA filter hurts scalping
@@ -123,14 +123,14 @@ class Settings(BaseSettings):
     ATR_SIZING_ENABLED: bool = False  # Use volatility-adjusted order sizes
     ATR_SIZING_PERIOD: int = 14  # ATR look-back period
     ATR_SIZING_TIMEFRAME: str = "5m"  # Timeframe for ATR bars
-    ATR_RISK_DOLLARS: float = 50.0  # Max $ risk per trade (size = risk / ATR)
+    ATR_RISK_DOLLARS: float = 500.0  # Scaled: max $ risk per trade (size = risk / ATR)
 
     # ── Risk Management ───────────────────────────────────────────────────────
-    MAX_DRAWDOWN_PERCENT: float = 5.0  # Tighter for day trading
+    MAX_DRAWDOWN_PERCENT: float = 8.0  # Scaled for larger positions
     STOP_LOSS_PERCENT: float = 2.0
-    MAX_POSITION_SIZE_USD: float = 2000.0  # Max $ in one stock
-    DAILY_LOSS_LIMIT_USD: float = 200.0
-    MAX_DAILY_TRADES: int = 20  # PDT awareness
+    MAX_POSITION_SIZE_USD: float = 25000.0  # Scaled: max $ in one stock
+    DAILY_LOSS_LIMIT_USD: float = 2000.0  # Scaled from $200
+    MAX_DAILY_TRADES: int = 40  # Increased for multi-strategy
     PDT_PROTECTION: bool = True  # Block trades that would trigger PDT rule
     RISK_PER_TRADE_PERCENT: float = 1.0  # Max % of portfolio risked per trade
     MAX_PORTFOLIO_HEAT: float = 6.0  # Max total % of portfolio at risk
@@ -183,8 +183,48 @@ class Settings(BaseSettings):
     TRADE_JOURNAL_DIR: str = "data"         # Directory for journal files
 
     # ── Ultra Bot: ML Feature Engine ──────────────────────────────────────────
-    ML_FEATURES_ENABLED: bool = False       # Compute ML features per trade
+    ML_FEATURES_ENABLED: bool = True        # Compute ML features per trade
     ML_WIN_PROB_GATE: float = 0.0           # Min win probability to enter (0=disabled)
+
+    # ── Short Selling ─────────────────────────────────────────────────────────
+    SHORT_SELLING_ENABLED: bool = True       # Allow short entries on bearish signals
+    SHORT_TREND_FILTER: bool = True          # Require bearish trend for shorts
+    SHORT_MAX_POSITION_USD: float = 25000.0  # Max $ per short position
+    SHORT_LOCATE_CHECK: bool = False         # Skip hard-to-borrow check (Alpaca handles)
+
+    # ── Limit Order Entries ───────────────────────────────────────────────────
+    LIMIT_ENTRY_ENABLED: bool = True         # Use limit orders for entries (better fills)
+    LIMIT_OFFSET_PCT: float = 0.02           # Offset from signal price (e.g. 0.02% below for buys)
+    LIMIT_ORDER_TIMEOUT_SECONDS: int = 120   # Cancel unfilled limit entries after N seconds
+
+    # ── Correlation-Based Risk ────────────────────────────────────────────────
+    CORRELATION_RISK_ENABLED: bool = True    # Check inter-position correlation
+    MAX_CORRELATED_EXPOSURE: float = 0.40    # Max 40% of portfolio in correlated assets (r>0.7)
+    CORRELATION_LOOKBACK_DAYS: int = 60      # Days of daily returns for correlation matrix
+    CORRELATION_THRESHOLD: float = 0.70      # Pearson r threshold for "correlated" pair
+
+    # ── Value-at-Risk (VaR) ───────────────────────────────────────────────────
+    VAR_ENABLED: bool = True                 # Pre-trade VaR check
+    VAR_CONFIDENCE: float = 0.95             # 95% confidence level
+    VAR_MAX_PORTFOLIO_PCT: float = 0.03      # Max 3% daily VaR as % of portfolio
+    VAR_LOOKBACK_DAYS: int = 30              # Days for historical VaR
+    VAR_METHOD: str = "historical"           # "historical" or "parametric"
+
+    # ── Walk-Forward Optimization ─────────────────────────────────────────────
+    WALK_FORWARD_ENABLED: bool = True        # Periodic walk-forward re-optimization
+    WALK_FORWARD_TRAIN_DAYS: int = 180       # Training window (6 months)
+    WALK_FORWARD_TEST_DAYS: int = 30         # Test/validation window (1 month)
+    WALK_FORWARD_INTERVAL_HOURS: int = 168   # Re-optimize every week (168h)
+
+    # ── Pairs Trading Strategy ────────────────────────────────────────────────
+    PAIRS_TRADING_ENABLED: bool = True       # Enable pairs/stat-arb strategy
+    PAIRS: list[str] = ["NVDA:AMD", "GOOGL:META", "MSFT:AAPL"]  # Colon-separated pairs
+    PAIRS_LOOKBACK_DAYS: int = 60            # Days for spread calculation
+    PAIRS_ENTRY_ZSCORE: float = 2.0          # Enter when z-score exceeds this
+    PAIRS_EXIT_ZSCORE: float = 0.5           # Exit when z-score reverts to this
+    PAIRS_STOP_ZSCORE: float = 3.5           # Stop-loss z-score
+    PAIRS_ORDER_SIZE_USD: float = 5000.0     # Per-leg notional
+    PAIRS_MAX_HOLDING_BARS: int = 100        # Max holding period (5min bars)
 
     # ── MACD Entry Confirmation ───────────────────────────────────────────────
     MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
@@ -265,10 +305,27 @@ class Settings(BaseSettings):
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Ensure strategy name is valid."""
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs"}
         if v.lower() not in allowed:
             raise ValueError(f"DEFAULT_STRATEGY must be one of {allowed}, got '{v}'")
         return v.lower()
+
+    @field_validator("PAIRS", mode="before")
+    @classmethod
+    def parse_pairs(cls, v: Any) -> list[str]:
+        """Accept JSON string, comma-separated string, or list for PAIRS."""
+        if isinstance(v, str):
+            if not v.strip():
+                return []
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                return [s.strip() for s in v.split(",") if s.strip()]
+        if isinstance(v, list):
+            return v
+        return v
 
     @field_validator("LOG_LEVEL")
     @classmethod
@@ -293,7 +350,7 @@ class Settings(BaseSettings):
         """If STRATEGIES is empty, fall back to [DEFAULT_STRATEGY]."""
         if not self.STRATEGIES:
             self.STRATEGIES = [self.DEFAULT_STRATEGY]
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs"}
         for s in self.STRATEGIES:
             if s not in allowed:
                 raise ValueError(f"Unknown strategy in STRATEGIES: '{s}'. Allowed: {allowed}")

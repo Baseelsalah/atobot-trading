@@ -101,12 +101,15 @@ class ORBStrategy(BaseStrategy):
             tp = Decimal(str(self.settings.ORB_TAKE_PROFIT_PERCENT))
             sl = Decimal(str(self.settings.ORB_STOP_LOSS_PERCENT))
 
+            # Determine exit side based on position direction
+            exit_side = OrderSide.SELL if pos.side == "LONG" else OrderSide.COVER
+
             # Trailing stop check (before fixed TP/SL)
             if self._check_trailing_stop(symbol, pos, current_price):
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -121,7 +124,7 @@ class ORBStrategy(BaseStrategy):
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -132,7 +135,7 @@ class ORBStrategy(BaseStrategy):
                 qty = round_quantity(pos.quantity, filters["step_size"])
                 if qty > Decimal("0"):
                     orders.append(Order(
-                        symbol=symbol, side=OrderSide.SELL,
+                        symbol=symbol, side=exit_side,
                         order_type=OrderType.MARKET, price=current_price,
                         quantity=qty, strategy=self.name,
                     ))
@@ -236,10 +239,47 @@ class ORBStrategy(BaseStrategy):
                 )
 
         elif current_price <= breakout_low:
-            # Bearish breakdown — for now we skip (long-only).
-            logger.debug(
-                "[ORB] Breakdown {} — skipping (long-only)", symbol
-            )
+            # Bearish breakdown — SHORT if enabled
+            if getattr(self.settings, "SHORT_SELLING_ENABLED", False):
+                # Volume confirmation for breakdown (same as breakout)
+                volume_ok = True
+                try:
+                    bars_5m = await self.exchange.get_klines(symbol, "5m", 40)
+                    if len(bars_5m) >= 20:
+                        df = pd.DataFrame(bars_5m)
+                        for col in ("open", "high", "low", "close", "volume"):
+                            df[col] = df[col].astype(float)
+                        vol_sma = indicators.volume_sma(df, 20)
+                        cur_vol = df["volume"].iloc[-1]
+                        avg_vol = vol_sma.iloc[-1]
+                        if avg_vol > 0:
+                            volume_ok = cur_vol >= avg_vol * 1.3
+                            if not volume_ok:
+                                logger.info(
+                                    "[ORB] BLOCKED weak volume breakdown {} | vol {:.0f} < 1.3x avg {:.0f}",
+                                    symbol, cur_vol, avg_vol,
+                                )
+                                return orders
+                except Exception as exc:
+                    logger.debug("[ORB] Volume check error for {}: {}", symbol, exc)
+
+                quantity = order_usd / current_price
+                quantity = round_quantity(quantity, filters["step_size"])
+                if quantity > Decimal("0"):
+                    orders.append(Order(
+                        symbol=symbol, side=OrderSide.SHORT,
+                        order_type=OrderType.MARKET, price=current_price,
+                        quantity=quantity, strategy=self.name,
+                    ))
+                    self._traded_today[symbol] = True
+                    logger.info(
+                        "[ORB] BREAKDOWN SHORT {} | price={} < low={} | volume confirmed",
+                        symbol, current_price, breakout_low,
+                    )
+            else:
+                logger.debug(
+                    "[ORB] Breakdown {} — skipping (short selling disabled)", symbol
+                )
 
         return orders
 
@@ -256,7 +296,18 @@ class ORBStrategy(BaseStrategy):
                 self._trailing_highs[symbol] = order.price
             else:
                 pos.add_to_position(order.price, order.filled_quantity)
-        elif order.side == OrderSide.SELL:
+        elif order.side == OrderSide.SHORT:
+            pos = self.positions.get(symbol)
+            if pos is None or pos.is_closed:
+                self.positions[symbol] = Position(
+                    symbol=symbol, side="SHORT",
+                    entry_price=order.price, current_price=order.price,
+                    quantity=order.filled_quantity, strategy=self.name,
+                )
+                self._trailing_highs[symbol] = order.price
+            else:
+                pos.add_to_position(order.price, order.filled_quantity)
+        elif order.side in (OrderSide.SELL, OrderSide.COVER):
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
                 pos.reduce_position(order.filled_quantity, order.price)

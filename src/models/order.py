@@ -16,6 +16,8 @@ class OrderSide(str, Enum):
 
     BUY = "BUY"
     SELL = "SELL"
+    SHORT = "SHORT"    # Open a short position
+    COVER = "COVER"    # Close a short position (buy-to-cover)
 
 
 class OrderStatus(str, Enum):

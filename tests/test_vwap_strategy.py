@@ -98,7 +98,7 @@ class TestVWAPEntry:
 
     @pytest.mark.asyncio
     async def test_no_entry_at_vwap(self, strategy: VWAPScalpStrategy) -> None:
-        """No entry if price is at or above VWAP."""
+        """No entry if price is at VWAP (within bounce threshold)."""
         bars = _make_bars([
             ("184", "186", "183", "185"),
             ("185", "187", "184", "186"),
@@ -106,8 +106,8 @@ class TestVWAPEntry:
         strategy.exchange.get_klines = AsyncMock(return_value=bars)
         await strategy.initialize("AAPL")
 
-        # Price right around VWAP — no entry
-        orders = await strategy.on_tick("AAPL", Decimal("186.00"))
+        # Price right at VWAP — no BUY (not below) and no SHORT (not far above)
+        orders = await strategy.on_tick("AAPL", Decimal("185.20"))
         assert orders == []
 
 
