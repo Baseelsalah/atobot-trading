@@ -229,10 +229,19 @@ class TradingEngine:
                     if getattr(self.settings, "FORCE_EOD_FLATTEN", True):
                         if not self.settings.DRY_RUN and hasattr(self.exchange, 'close_all_positions'):
                             try:
-                                # Collect swing-exempt symbols
+                                # Collect swing/crypto-exempt symbols
                                 swing_symbols = self._get_swing_exempt_symbols()
+                                # Build known crypto set (both slash & no-slash formats)
+                                crypto_syms: set[str] = set()
+                                for _cs in getattr(self.settings, 'CRYPTO_SYMBOLS', []):
+                                    crypto_syms.add(_cs)
+                                    crypto_syms.add(_cs.replace("/", ""))
                                 positions = await self.exchange.get_positions() if hasattr(self.exchange, 'get_positions') else []
-                                non_swing = [p for p in positions if p['symbol'] not in swing_symbols]
+                                non_swing = [
+                                    p for p in positions
+                                    if p['symbol'] not in swing_symbols
+                                    and p['symbol'] not in crypto_syms  # crypto trades 24/7
+                                ]
                                 if non_swing:
                                     logger.warning(
                                         "ZERO OVERNIGHT: Market closed with {} day-trade positions — force closing! "
@@ -1260,20 +1269,34 @@ class TradingEngine:
     # ── Swing-aware position management ───────────────────────────────────────
 
     def _get_swing_exempt_symbols(self) -> set[str]:
-        """Return symbols held by swing strategies (exempt from EOD flatten)."""
+        """Return symbols held by swing/crypto strategies (exempt from EOD flatten).
+
+        Returns BOTH formats: 'BTC/USD' and 'BTCUSD' so the lookup works
+        regardless of whether the caller uses the strategy format or the
+        Alpaca API format.
+        """
         swing_symbols: set[str] = set()
         for strat in self.strategies:
             if getattr(strat, 'exempt_eod_flatten', False):
                 for sym, pos in strat.positions.items():
                     if not pos.is_closed:
                         swing_symbols.add(sym)
+                        # Also add Alpaca API format (BTC/USD -> BTCUSD)
+                        swing_symbols.add(sym.replace("/", ""))
         return swing_symbols
 
     async def _close_non_swing_positions(self) -> None:
-        """Close all positions EXCEPT those held by swing strategies."""
+        """Close all positions EXCEPT those held by swing/crypto strategies."""
         swing_symbols = self._get_swing_exempt_symbols()
-        if not swing_symbols:
-            # No swing positions — use fast close_all
+        # Also exempt all configured crypto symbols (24/7 trading)
+        crypto_syms: set[str] = set()
+        for _cs in getattr(self.settings, 'CRYPTO_SYMBOLS', []):
+            crypto_syms.add(_cs)
+            crypto_syms.add(_cs.replace("/", ""))
+        exempt = swing_symbols | crypto_syms
+
+        if not exempt:
+            # No exempt positions — use fast close_all
             await self.exchange.close_all_positions()
             return
 
@@ -1281,13 +1304,13 @@ class TradingEngine:
         closed = 0
         kept = 0
         for p in positions:
-            if p['symbol'] in swing_symbols:
+            if p['symbol'] in exempt:
                 kept += 1
-                logger.info("EOD: Keeping swing position {} ({} shares)", p['symbol'], p['qty'])
+                logger.info("EOD: Keeping exempt position {} ({} shares)", p['symbol'], p['qty'])
             else:
                 await self.exchange.close_position(p['symbol'])
                 closed += 1
-        logger.info("EOD flatten: closed {} day-trade positions, kept {} swing positions", closed, kept)
+        logger.info("EOD flatten: closed {} day-trade positions, kept {} exempt positions", closed, kept)
 
     # ── Stale order cleanup ───────────────────────────────────────────────────
 
