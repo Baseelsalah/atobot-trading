@@ -1290,9 +1290,12 @@ class TradingEngine:
         swing_symbols = self._get_swing_exempt_symbols()
         # Also exempt all configured crypto symbols (24/7 trading)
         crypto_syms: set[str] = set()
-        for _cs in getattr(self.settings, 'CRYPTO_SYMBOLS', []):
-            crypto_syms.add(_cs)
-            crypto_syms.add(_cs.replace("/", ""))
+        crypto_str = getattr(self.settings, 'CRYPTO_SYMBOLS', '')
+        for _cs in (crypto_str.split(',') if isinstance(crypto_str, str) else crypto_str):
+            _cs = _cs.strip()
+            if _cs:
+                crypto_syms.add(_cs)
+                crypto_syms.add(_cs.replace("/", ""))
         exempt = swing_symbols | crypto_syms
 
         if not exempt:

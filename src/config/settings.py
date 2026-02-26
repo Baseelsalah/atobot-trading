@@ -271,7 +271,7 @@ class Settings(BaseSettings):
     # ── Crypto Swing Strategy (24/7 Alpaca Crypto) ────────────────────────
     # Backtest-optimized (Config D: Conservative) — 6mo +22.9%, PF 1.53
     CRYPTO_ENABLED: bool = True              # Master switch for crypto trading
-    CRYPTO_SYMBOLS: str = "BTC/USD,ETH/USD"  # Comma-separated crypto pairs
+    CRYPTO_SYMBOLS: str = "BTC/USD,ETH/USD,SOL/USD,AVAX/USD,LINK/USD,DOGE/USD,DOT/USD,LTC/USD"
     CRYPTO_RSI_OVERSOLD: float = 35.0        # RSI entry threshold (crypto is volatile)
     CRYPTO_RSI_OVERBOUGHT: float = 75.0      # RSI exit threshold
     CRYPTO_VOLUME_SURGE: float = 1.5         # Min rel volume for entry
@@ -281,11 +281,13 @@ class Settings(BaseSettings):
     CRYPTO_TRAILING_ACTIVATION_PCT: float = 5.0  # Activate trailing at +5%
     CRYPTO_TRAILING_OFFSET_PCT: float = 2.5  # Trail distance from high
     CRYPTO_MAX_HOLD_DAYS: int = 14           # Max days before time stop
-    CRYPTO_MAX_POSITIONS: int = 2            # Max concurrent crypto positions
+    CRYPTO_MAX_POSITIONS: int = 4            # Max concurrent crypto positions
+    CRYPTO_MAX_ALT_POSITIONS: int = 3        # Max altcoin positions (correlation limit)
     CRYPTO_RISK_PER_TRADE_PCT: float = 4.0   # Risk 4% per trade (aggressive)
     CRYPTO_ORDER_SIZE_USD: float = 200.0     # Fallback order size for $500 acct
     CRYPTO_EQUITY_CAP: float = 0.0           # Cap equity for sizing (0 = use real)
     CRYPTO_BTC_TREND_GATE: bool = True       # Only enter alts if BTC trend is up
+    CRYPTO_BTC_PANIC_RSI: float = 30.0       # Block ALL alt longs when BTC RSI < this
     CRYPTO_FEE_BPS: float = 25.0             # Alpaca taker fee (basis points)
 
     # ── Crypto v2 Enhancements ────────────────────────────────────────────

@@ -1,18 +1,22 @@
-"""Crypto Swing Trading Strategy v2 — 24/7 Alpaca Crypto.
+"""Crypto Swing Trading Strategy v3 — 24/7 Alpaca Crypto, Multi-Pair.
 
 Designed for $500-$25K accounts trading crypto on Alpaca.
-Captures 3-12% moves over 1-14 days on BTC/USD and ETH/USD.
+Captures 3-20% moves over 1-14 days across 8 crypto pairs:
+  BTC/USD, ETH/USD, SOL/USD, AVAX/USD, LINK/USD, DOGE/USD, DOT/USD, LTC/USD
 
-Crypto-specific advantages over stock swing:
-  - 24/7 markets → more entry opportunities
-  - No PDT rule at all
-  - Fractional shares down to tiny amounts
-  - Higher volatility → bigger targets (but wider stops)
+Per-asset volatility profiles:
+  - BTC: baseline stops/targets/sizing (leader asset)
+  - ETH: 1.2x SL, 1.3x TP, 0.9x size
+  - SOL/AVAX: 1.5x SL, 1.8x TP, 0.6-0.7x size (high vol alts)
+  - DOGE: 1.8x SL, 2.2x TP, 0.5x size, needs 4 confluence (meme coin)
+  - LINK/DOT/LTC: 1.3-1.5x SL, 1.5-1.7x TP, 0.6-0.7x size
 
 Gate Filters (must all pass or skip entry):
   - ADX > 20 (skip choppy/ranging markets)
   - Daily EMA20 > EMA50 AND daily RSI > 45 (macro uptrend)
-  - BTC trend gate: alts only enter if BTC 20-EMA > 50-EMA
+  - BTC trend gate: alts only enter if BTC bullish
+  - BTC panic gate: block ALL alt longs when BTC RSI < 30
+  - Alt correlation limit: max 3 alts open simultaneously
 
 Entry Signals (need N confluence from 9 possible):
   1. RSI oversold bounce (<35 crossing back above 35) on 4H bars
@@ -27,7 +31,8 @@ Entry Signals (need N confluence from 9 possible):
 
 Exit Signals:
   - Multi-level take profit: 33% at TP1, 33% at TP2, 34% at TP3
-  - Stop loss: dynamic ATR-based (3-7%, clamped)
+    (TP levels scaled by per-asset profile multiplier)
+  - Stop loss: dynamic ATR-based (3-7% base, scaled by asset profile)
   - Move stop to breakeven after first TP hit
   - Trailing stop: activates at configured %, trails from high
   - Time stop: max hold days
@@ -35,8 +40,9 @@ Exit Signals:
 
 Position Sizing:
   - Risk N% of account per trade (ATR-based stop → adaptive size)
+  - Per-asset size multiplier (smaller for volatile alts)
   - Fear & Greed Index adjustment (extreme fear = +25%, extreme greed = -50%)
-  - Max 2 concurrent crypto positions
+  - Max 4 concurrent crypto positions, max 3 alts
   - Fractional shares
   - Accounts for 0.25% taker fee in size calc
 
@@ -66,13 +72,54 @@ from src.utils.helpers import round_quantity
 
 
 class CryptoSwingStrategy(BaseStrategy):
-    """Crypto swing trading strategy v2 — optimized for small account growth.
+    """Crypto swing trading strategy v3 — multi-pair with per-asset profiles.
 
     Uses 4H-timeframe signals with 24/7 monitoring + daily macro gate.
-    Holds positions 1-14 days to capture crypto swings.
-    Features: ADX regime filter, Bollinger Bands, MACD, RSI divergence,
+    Holds positions 1-14 days to capture crypto swings across 8 pairs.
+    Features: per-asset volatility profiles, BTC correlation gate,
+              ADX regime filter, Bollinger Bands, MACD, RSI divergence,
               multi-level TP, dynamic ATR stops, Fear & Greed sizing.
     """
+
+    # ── Per-asset volatility profiles ─────────────────────────────────────
+    # Each coin has different volatility → different SL/TP/sizing
+    # sl_mult/tp_mult: multiplier on base stop-loss/take-profit percentages
+    # size_mult: multiplier on position size (smaller for higher vol)
+    # min_confluence: higher bar for riskier assets
+    ASSET_PROFILES: dict[str, dict] = {
+        "BTC/USD": {
+            "sl_mult": 1.0, "tp_mult": 1.0, "size_mult": 1.0,
+            "min_confluence": 3, "label": "Bitcoin", "is_leader": True,
+        },
+        "ETH/USD": {
+            "sl_mult": 1.2, "tp_mult": 1.3, "size_mult": 0.9,
+            "min_confluence": 3, "label": "Ethereum", "is_leader": False,
+        },
+        "SOL/USD": {
+            "sl_mult": 1.5, "tp_mult": 1.8, "size_mult": 0.7,
+            "min_confluence": 3, "label": "Solana", "is_leader": False,
+        },
+        "AVAX/USD": {
+            "sl_mult": 1.5, "tp_mult": 1.8, "size_mult": 0.6,
+            "min_confluence": 3, "label": "Avalanche", "is_leader": False,
+        },
+        "LINK/USD": {
+            "sl_mult": 1.4, "tp_mult": 1.6, "size_mult": 0.7,
+            "min_confluence": 3, "label": "Chainlink", "is_leader": False,
+        },
+        "DOGE/USD": {
+            "sl_mult": 1.8, "tp_mult": 2.2, "size_mult": 0.5,
+            "min_confluence": 4, "label": "Dogecoin", "is_leader": False,
+        },
+        "DOT/USD": {
+            "sl_mult": 1.5, "tp_mult": 1.7, "size_mult": 0.6,
+            "min_confluence": 3, "label": "Polkadot", "is_leader": False,
+        },
+        "LTC/USD": {
+            "sl_mult": 1.3, "tp_mult": 1.5, "size_mult": 0.7,
+            "min_confluence": 3, "label": "Litecoin", "is_leader": False,
+        },
+    }
 
     # ── Flag: engine should NOT flatten crypto positions at EOD ──
     exempt_eod_flatten: bool = True
@@ -99,6 +146,7 @@ class CryptoSwingStrategy(BaseStrategy):
         self._tick_count_local: int = 0
         self._btc_trend_bullish: bool | None = None      # BTC trend cache
         self._btc_trend_checked: str = ""                 # Hour str of last BTC check
+        self._btc_rsi: float | None = None                # BTC RSI (for panic gate)
         self._cooldown_until: dict[str, datetime] = {}   # symbol -> cooldown expiry after stop-loss
 
         # ── Multi-level TP tracking ──
@@ -130,6 +178,8 @@ class CryptoSwingStrategy(BaseStrategy):
         self._order_size_usd = float(getattr(settings, 'CRYPTO_ORDER_SIZE_USD', 200.0))
         self._equity_cap = float(getattr(settings, 'CRYPTO_EQUITY_CAP', 0))
         self._btc_trend_gate = bool(getattr(settings, 'CRYPTO_BTC_TREND_GATE', True))
+        self._btc_panic_rsi = float(getattr(settings, 'CRYPTO_BTC_PANIC_RSI', 30.0))
+        self._max_alt_positions = int(getattr(settings, 'CRYPTO_MAX_ALT_POSITIONS', 3))
         self._fee_bps = float(getattr(settings, 'CRYPTO_FEE_BPS', 25.0))
 
         # v2 params: ADX, Bollinger, MACD, multi-TP, Fear & Greed
@@ -148,22 +198,25 @@ class CryptoSwingStrategy(BaseStrategy):
         self._fear_greed_enabled = bool(getattr(settings, 'CRYPTO_FEAR_GREED_ENABLED', True))
 
         logger.info(
-            "[CRYPTO v2] Initialized: TP={:.1f}%/{:.1f}%/{:.1f}% (multi={}), "
+            "[CRYPTO v3] Initialized: TP={:.1f}%/{:.1f}%/{:.1f}% (multi={}), "
             "SL={:.1f}% (dynamic={}), Trail +{:.1f}%/{:.1f}% | "
             "RSI<{:.0f}, ADX>{:.0f} (enabled={}), BB={}/{:.1f} (enabled={}), "
             "MACD={}, DailyGate={}, F&G={} | "
-            "max_pos={}, risk/trade={:.1f}%, hold≤{}d | "
-            "equity_cap=${} | BTC_gate={} | fee={}bps",
+            "max_pos={}, max_alt={}, risk/trade={:.1f}%, hold≤{}d | "
+            "equity_cap=${} | BTC_gate={} (panic<{:.0f}) | fee={}bps | "
+            "pairs={}",
             self._tp1_pct, self._tp2_pct, self._tp3_pct, self._multi_tp_enabled,
             self._stop_loss_pct, self._dynamic_stops,
             self._trailing_act_pct, self._trailing_offset_pct,
             self._rsi_oversold, self._adx_min_trend, self._adx_filter_enabled,
             self._bb_period, self._bb_std, self._bb_filter_enabled,
             self._macd_enabled, self._daily_trend_gate, self._fear_greed_enabled,
-            self._max_positions, self._risk_per_trade,
+            self._max_positions, self._max_alt_positions, self._risk_per_trade,
             self._max_hold_days,
             int(self._equity_cap) if self._equity_cap else "disabled",
-            self._btc_trend_gate, int(self._fee_bps),
+            self._btc_trend_gate, self._btc_panic_rsi,
+            int(self._fee_bps),
+            getattr(settings, 'CRYPTO_SYMBOLS', 'BTC/USD,ETH/USD'),
         )
 
     @property
@@ -228,6 +281,20 @@ class CryptoSwingStrategy(BaseStrategy):
         if active_count >= self._max_positions:
             return orders
 
+        # ── Alt exposure limit: max N alts at once (correlation risk) ────
+        profile = self._get_asset_profile(symbol)
+        if not profile.get("is_leader", False):
+            alt_count = sum(
+                1 for sym, p in self.positions.items()
+                if not p.is_closed and not self._get_asset_profile(sym).get("is_leader", False)
+            )
+            if alt_count >= self._max_alt_positions:
+                logger.debug(
+                    "[CRYPTO] Alt limit: {} alts already open, blocking {}",
+                    alt_count, symbol,
+                )
+                return orders
+
         # Active orders check — don't place if we already have pending
         if self._get_active_orders_for(symbol):
             return orders
@@ -235,6 +302,16 @@ class CryptoSwingStrategy(BaseStrategy):
         # ── BTC trend gate for non-BTC pairs ─────────────────────────────
         if self._btc_trend_gate and "BTC" not in symbol:
             btc_bullish = await self._check_btc_trend()
+
+            # Hard block: BTC panic selling (RSI < 30) blocks ALL alt longs
+            if self._btc_rsi is not None and self._btc_rsi < self._btc_panic_rsi:
+                logger.info(
+                    "[CRYPTO] BTC PANIC gate BLOCKED {} — BTC RSI={:.0f} < {:.0f}",
+                    symbol, self._btc_rsi, self._btc_panic_rsi,
+                )
+                self._eval_done[symbol] = eval_key
+                return orders
+
             if not btc_bullish:
                 logger.debug(
                     "[CRYPTO] BTC trend gate BLOCKED {} — BTC in downtrend", symbol
@@ -264,20 +341,25 @@ class CryptoSwingStrategy(BaseStrategy):
 
             confluence, details = self._compute_confluence(df, float(current_price))
 
-            if confluence >= self._min_confluence:
+            # Per-asset min confluence (e.g., DOGE needs 4, BTC needs 3)
+            asset_profile = self._get_asset_profile(symbol)
+            min_conf = asset_profile.get("min_confluence", self._min_confluence)
+
+            if confluence >= min_conf:
                 entry_order = await self._create_entry_order(
                     symbol, current_price, df
                 )
                 if entry_order:
                     orders.append(entry_order)
                     logger.info(
-                        "[CRYPTO] ENTRY signal {} | confluence={}/{} | price={} | {}",
-                        symbol, confluence, 9, current_price, ", ".join(details),
+                        "[CRYPTO] ENTRY signal {} ({}) | confluence={}/{} (need {}) | price={} | {}",
+                        symbol, asset_profile.get("label", symbol),
+                        confluence, 9, min_conf, current_price, ", ".join(details),
                     )
             else:
                 logger.debug(
                     "[CRYPTO] No entry for {} | confluence={}/{} (need {})",
-                    symbol, confluence, 9, self._min_confluence,
+                    symbol, confluence, 9, min_conf,
                 )
 
         except Exception as exc:
@@ -311,6 +393,11 @@ class CryptoSwingStrategy(BaseStrategy):
             self._tp_level_hit[symbol] = 0
             self._breakeven_set[symbol] = False
 
+            # ── Per-asset profile multipliers ────────────────────────────
+            asset_profile = self._get_asset_profile(symbol)
+            sl_mult = asset_profile.get("sl_mult", 1.0)
+            tp_mult = asset_profile.get("tp_mult", 1.0)
+
             # ── Dynamic ATR-based stop loss ──────────────────────────────
             if self._dynamic_stops:
                 try:
@@ -323,28 +410,37 @@ class CryptoSwingStrategy(BaseStrategy):
                         if atr is not None and float(entry_price) > 0:
                             vol_ratio = atr / float(entry_price)
                             dynamic_sl = max(0.03, min(0.07, vol_ratio * 2)) * 100
+                            # Apply per-asset multiplier
+                            dynamic_sl *= sl_mult
                             sl_price = entry_price * Decimal(str(1 - dynamic_sl / 100))
                             logger.info(
                                 "[CRYPTO] Dynamic SL: ATR={:.0f}, vol_ratio={:.4f}, "
-                                "SL={:.2f}% → ${}",
-                                atr, vol_ratio, dynamic_sl, sl_price,
+                                "SL={:.2f}% (x{:.1f}) → ${}",
+                                atr, vol_ratio, dynamic_sl, sl_mult, sl_price,
                             )
                         else:
-                            sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                            sl_pct = self._stop_loss_pct * sl_mult
+                            sl_price = entry_price * Decimal(str(1 - sl_pct / 100))
                     else:
-                        sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                        sl_pct = self._stop_loss_pct * sl_mult
+                        sl_price = entry_price * Decimal(str(1 - sl_pct / 100))
                 except Exception:
-                    sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                    sl_pct = self._stop_loss_pct * sl_mult
+                    sl_price = entry_price * Decimal(str(1 - sl_pct / 100))
             else:
-                sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                sl_pct = self._stop_loss_pct * sl_mult
+                sl_price = entry_price * Decimal(str(1 - sl_pct / 100))
 
             self._swing_stops[symbol] = sl_price
 
-            # ── Multi-level take profit setup ────────────────────────────
+            # ── Multi-level take profit setup (scaled by asset profile) ──
             if self._multi_tp_enabled:
-                tp1 = entry_price * Decimal(str(1 + self._tp1_pct / 100))
-                tp2 = entry_price * Decimal(str(1 + self._tp2_pct / 100))
-                tp3 = entry_price * Decimal(str(1 + self._tp3_pct / 100))
+                tp1_pct = self._tp1_pct * tp_mult
+                tp2_pct = self._tp2_pct * tp_mult
+                tp3_pct = self._tp3_pct * tp_mult
+                tp1 = entry_price * Decimal(str(1 + tp1_pct / 100))
+                tp2 = entry_price * Decimal(str(1 + tp2_pct / 100))
+                tp3 = entry_price * Decimal(str(1 + tp3_pct / 100))
                 self._tp_levels[symbol] = [
                     (0.33, tp1),   # Take 33% at TP1
                     (0.33, tp2),   # Take 33% at TP2
@@ -352,22 +448,26 @@ class CryptoSwingStrategy(BaseStrategy):
                 ]
                 final_tp = tp3
                 logger.info(
-                    "[CRYPTO] Multi-TP: TP1=${} (+{:.1f}%), TP2=${} (+{:.1f}%), "
-                    "TP3=${} (+{:.1f}%)",
-                    tp1, self._tp1_pct, tp2, self._tp2_pct, tp3, self._tp3_pct,
+                    "[CRYPTO] Multi-TP {}: TP1=${} (+{:.1f}%), TP2=${} (+{:.1f}%), "
+                    "TP3=${} (+{:.1f}%) [x{:.1f}]",
+                    symbol, tp1, tp1_pct, tp2, tp2_pct, tp3, tp3_pct, tp_mult,
                 )
             else:
-                tp_price = entry_price * Decimal(str(1 + self._take_profit_pct / 100))
+                tp_pct = self._take_profit_pct * tp_mult
+                tp_price = entry_price * Decimal(str(1 + tp_pct / 100))
                 final_tp = tp_price
 
             self._swing_targets[symbol] = final_tp
 
             logger.info(
-                "[CRYPTO] Position OPENED {} | entry={} qty={} | "
-                "SL={} TP={} | dynamic_sl={} multi_tp={}",
-                symbol, entry_price, qty,
+                "[CRYPTO] Position OPENED {} ({}) | entry={} qty={} | "
+                "SL={} TP={} | dynamic_sl={} multi_tp={} | "
+                "sl_mult={:.1f} tp_mult={:.1f}",
+                symbol, asset_profile.get("label", symbol),
+                entry_price, qty,
                 sl_price, final_tp,
                 self._dynamic_stops, self._multi_tp_enabled,
+                sl_mult, tp_mult,
             )
 
         elif side == "SELL":
@@ -715,6 +815,7 @@ class CryptoSwingStrategy(BaseStrategy):
 
         Accounts for Alpaca's 25 bps taker fee on both entry and exit.
         Adjusts for Fear & Greed sentiment (extreme fear = bigger, extreme greed = smaller).
+        Applies per-asset size multiplier (smaller for high-vol alts).
         """
         try:
             balances = await self.exchange.get_account_balance()
@@ -736,6 +837,11 @@ class CryptoSwingStrategy(BaseStrategy):
             effective_risk = stop_distance_pct + fee_pct
 
             position_usd = risk_amount / effective_risk
+
+            # ── Per-asset size multiplier ────────────────────────────────
+            asset_profile = self._get_asset_profile(symbol)
+            size_mult = asset_profile.get("size_mult", 1.0)
+            position_usd *= size_mult
 
             # ── Fear & Greed adjustment ──────────────────────────────────
             if self._fear_greed_enabled:
@@ -771,9 +877,10 @@ class CryptoSwingStrategy(BaseStrategy):
             qty = round(qty, 6)
 
             logger.debug(
-                "[CRYPTO] Size calc {} | equity=${:.0f} risk=${:.0f} | "
-                "position=${:.0f} qty={:.6f} @ {}",
-                symbol, equity, risk_amount, position_usd, qty, price,
+                "[CRYPTO] Size calc {} ({}) | equity=${:.0f} risk=${:.0f} | "
+                "position=${:.0f} (x{:.1f}) qty={:.6f} @ {}",
+                symbol, asset_profile.get("label", symbol),
+                equity, risk_amount, position_usd, size_mult, qty, price,
             )
             return qty
 
@@ -787,6 +894,7 @@ class CryptoSwingStrategy(BaseStrategy):
     async def _check_btc_trend(self) -> bool:
         """Check if BTC is in an uptrend (20-EMA > 50-EMA on daily).
 
+        Also tracks BTC RSI for the panic gate (RSI < 30 = block all alts).
         Cached for 4 hours to avoid excessive API calls.
         """
         now = datetime.now(timezone.utc)
@@ -798,6 +906,7 @@ class CryptoSwingStrategy(BaseStrategy):
             bars = await self.exchange.get_klines("BTC/USD", "1d", 60)
             if len(bars) < 50:
                 self._btc_trend_bullish = True  # Fail-open if insufficient data
+                self._btc_rsi = None
                 return True
 
             df = pd.DataFrame(bars)
@@ -806,6 +915,10 @@ class CryptoSwingStrategy(BaseStrategy):
 
             ema20 = self._calc_ema(df, 20)
             ema50 = self._calc_ema(df, 50)
+            rsi = self._calc_rsi(df, 14)
+
+            # Track RSI for panic gate
+            self._btc_rsi = rsi
 
             if ema20 is not None and ema50 is not None:
                 self._btc_trend_bullish = ema20 > ema50
@@ -814,9 +927,9 @@ class CryptoSwingStrategy(BaseStrategy):
 
             self._btc_trend_checked = check_key
             logger.info(
-                "[CRYPTO] BTC trend check: {} (20-EMA={:.0f}, 50-EMA={:.0f})",
+                "[CRYPTO] BTC trend check: {} (20-EMA={:.0f}, 50-EMA={:.0f}, RSI={:.1f})",
                 "BULLISH" if self._btc_trend_bullish else "BEARISH",
-                ema20 or 0, ema50 or 0,
+                ema20 or 0, ema50 or 0, rsi or 0,
             )
             return self._btc_trend_bullish
 
@@ -1198,6 +1311,15 @@ class CryptoSwingStrategy(BaseStrategy):
             return True
 
         return False
+
+    # ── Asset Profile Helper ────────────────────────────────────────────────
+
+    def _get_asset_profile(self, symbol: str) -> dict:
+        """Get per-asset volatility profile, with safe defaults for unknown pairs."""
+        return self.ASSET_PROFILES.get(symbol, {
+            "sl_mult": 1.5, "tp_mult": 1.8, "size_mult": 0.5,
+            "min_confluence": 4, "label": symbol, "is_leader": False,
+        })
 
     # ── Cleanup ───────────────────────────────────────────────────────────────
 
