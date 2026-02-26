@@ -119,7 +119,14 @@ class CryptoSwingStrategy(BaseStrategy):
         return "crypto_swing"
 
     async def initialize(self, symbol: str) -> None:
-        """Pre-load 4H bars for the crypto symbol."""
+        """Pre-load 4H bars for the crypto symbol.
+
+        Silently skips non-crypto symbols (stocks) since those are
+        handled by other strategies.
+        """
+        # Only initialize crypto pairs (contain "/")
+        if "/" not in symbol:
+            return
         if symbol in self._initialized_symbols:
             return
         try:
@@ -133,6 +140,11 @@ class CryptoSwingStrategy(BaseStrategy):
         """Main tick handler — manage positions and scan for entries."""
         self._tick_count_local += 1
         orders: list[Order] = []
+
+        # Skip non-crypto symbols (engine routing should prevent this,
+        # but guard defensively)
+        if "/" not in symbol:
+            return orders
 
         # ── Manage existing position ─────────────────────────────────────
         pos = self.positions.get(symbol)

@@ -466,8 +466,13 @@ class TradingEngine:
                 adjusted_qty = float(order.quantity) * self.strategy_selector.get_size_multiplier()
                 weight = self.strategy_selector.get_strategy_weight(strat.name)
                 adjusted_qty *= weight
-                adjusted_qty = max(1.0, adjusted_qty)
-                order.quantity = Decimal(str(int(adjusted_qty)))
+                # Crypto uses fractional shares (0.003 BTC); stocks need min 1 share
+                if self._is_crypto_symbol(order.symbol):
+                    adjusted_qty = max(0.000001, adjusted_qty)
+                    order.quantity = Decimal(str(round(adjusted_qty, 6)))
+                else:
+                    adjusted_qty = max(1.0, adjusted_qty)
+                    order.quantity = Decimal(str(int(adjusted_qty)))
                 if weight != 1.0 or self.strategy_selector.get_size_multiplier() != 1.0:
                     logger.debug(
                         "Size adjusted: {} qty={} (regime={:.2f}x, weight={:.2f}) [{}]",
