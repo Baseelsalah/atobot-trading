@@ -288,6 +288,21 @@ class Settings(BaseSettings):
     CRYPTO_BTC_TREND_GATE: bool = True       # Only enter alts if BTC trend is up
     CRYPTO_FEE_BPS: float = 25.0             # Alpaca taker fee (basis points)
 
+    # ── Crypto v2 Enhancements ────────────────────────────────────────────
+    CRYPTO_ADX_FILTER_ENABLED: bool = True   # Skip entry if ADX < threshold (choppy)
+    CRYPTO_ADX_MIN_TREND: float = 20.0       # ADX minimum for trending market
+    CRYPTO_BB_FILTER_ENABLED: bool = True     # Bollinger Band lower-half filter
+    CRYPTO_BB_PERIOD: int = 20               # BB lookback period
+    CRYPTO_BB_STD: float = 2.0               # BB standard deviations
+    CRYPTO_MACD_ENABLED: bool = True         # MACD histogram rising as confluence
+    CRYPTO_DAILY_TREND_GATE: bool = True     # Daily EMA20>EMA50 + RSI>45 gate
+    CRYPTO_MULTI_TP_ENABLED: bool = True     # Multi-level take-profit (3 stages)
+    CRYPTO_TP1_PCT: float = 5.0              # TP1: sell 33% at +5%
+    CRYPTO_TP2_PCT: float = 8.0              # TP2: sell 33% at +8%
+    CRYPTO_TP3_PCT: float = 12.0             # TP3: sell 34% at +12%
+    CRYPTO_DYNAMIC_STOPS: bool = True        # ATR-based dynamic stop-loss (3-7%)
+    CRYPTO_FEAR_GREED_ENABLED: bool = True   # Fear & Greed Index sizing adjustment
+
     # ── MACD Entry Confirmation ───────────────────────────────────────────────
     MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
     MACD_FAST: int = 12

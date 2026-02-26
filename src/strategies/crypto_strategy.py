@@ -1,7 +1,7 @@
-"""Crypto Swing Trading Strategy — 24/7 Alpaca Crypto.
+"""Crypto Swing Trading Strategy v2 — 24/7 Alpaca Crypto.
 
 Designed for $500-$25K accounts trading crypto on Alpaca.
-Captures 3-8% moves over 1-7 days on BTC/USD and ETH/USD.
+Captures 3-12% moves over 1-14 days on BTC/USD and ETH/USD.
 
 Crypto-specific advantages over stock swing:
   - 24/7 markets → more entry opportunities
@@ -9,23 +9,33 @@ Crypto-specific advantages over stock swing:
   - Fractional shares down to tiny amounts
   - Higher volatility → bigger targets (but wider stops)
 
-Entry Signals (need 2+ confluence):
+Gate Filters (must all pass or skip entry):
+  - ADX > 20 (skip choppy/ranging markets)
+  - Daily EMA20 > EMA50 AND daily RSI > 45 (macro uptrend)
+  - BTC trend gate: alts only enter if BTC 20-EMA > 50-EMA
+
+Entry Signals (need N confluence from 9 possible):
   1. RSI oversold bounce (<35 crossing back above 35) on 4H bars
   2. Price near rising 20-EMA support (within 1.5 ATR)
-  3. Volume surge (>1.5x 20-period avg)
+  3. Volume surge (>1.5x = +1, >3x = +2) — tiered
   4. Bullish candle pattern (hammer, engulfing)
   5. EMA stack alignment (20 > 50 = uptrend)
-  6. BTC trend gate: alts (ETH) only enter if BTC 20-EMA > 50-EMA
+  6. Price recovery from recent low (momentum shift)
+  7. Bollinger Band: price in lower half of BB
+  8. MACD histogram rising (momentum confirmation)
+  9. RSI bullish divergence (price lower-low, RSI higher-low)
 
 Exit Signals:
-  - Take profit: 10%+ (ATR-scaled, wide for crypto swings)
-  - Stop loss: 5% (crypto needs breathing room)
-  - Trailing stop: activates at +5%, trails at 2.5%
-  - Time stop: 14 days max hold
+  - Multi-level take profit: 33% at TP1, 33% at TP2, 34% at TP3
+  - Stop loss: dynamic ATR-based (3-7%, clamped)
+  - Move stop to breakeven after first TP hit
+  - Trailing stop: activates at configured %, trails from high
+  - Time stop: max hold days
   - No EOD flatten (24/7 market, exempt from stock flatten)
 
 Position Sizing:
-  - Risk 4% of account per trade (aggressive for growth)
+  - Risk N% of account per trade (ATR-based stop → adaptive size)
+  - Fear & Greed Index adjustment (extreme fear = +25%, extreme greed = -50%)
   - Max 2 concurrent crypto positions
   - Fractional shares
   - Accounts for 0.25% taker fee in size calc
@@ -37,9 +47,12 @@ Fee Structure:
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import aiohttp
+import numpy as np
 import pandas as pd
 from loguru import logger
 
@@ -53,10 +66,12 @@ from src.utils.helpers import round_quantity
 
 
 class CryptoSwingStrategy(BaseStrategy):
-    """Crypto swing trading strategy optimized for small account growth.
+    """Crypto swing trading strategy v2 — optimized for small account growth.
 
-    Uses 4H-timeframe signals with 24/7 monitoring.
-    Holds positions 1-7 days to capture crypto swings.
+    Uses 4H-timeframe signals with 24/7 monitoring + daily macro gate.
+    Holds positions 1-14 days to capture crypto swings.
+    Features: ADX regime filter, Bollinger Bands, MACD, RSI divergence,
+              multi-level TP, dynamic ATR stops, Fear & Greed sizing.
     """
 
     # ── Flag: engine should NOT flatten crypto positions at EOD ──
@@ -74,10 +89,11 @@ class CryptoSwingStrategy(BaseStrategy):
         self._bar_cache: dict[str, list[dict]] = {}    # 4H bars cache
         self._daily_cache: dict[str, list[dict]] = {}  # Daily bars cache
         self._last_bar_fetch: dict[str, datetime] = {}
+        self._last_daily_fetch: dict[str, datetime] = {}
         self._entry_dates: dict[str, datetime] = {}     # symbol -> entry datetime
         self._swing_highs: dict[str, Decimal] = {}      # symbol -> highest since entry
         self._swing_stops: dict[str, Decimal] = {}       # symbol -> stop loss price
-        self._swing_targets: dict[str, Decimal] = {}     # symbol -> take profit price
+        self._swing_targets: dict[str, Decimal] = {}     # symbol -> final TP price
         self._trailing_active: dict[str, bool] = {}      # symbol -> trailing activated
         self._eval_done: dict[str, str] = {}             # symbol -> hour_str of last eval
         self._tick_count_local: int = 0
@@ -85,7 +101,21 @@ class CryptoSwingStrategy(BaseStrategy):
         self._btc_trend_checked: str = ""                 # Hour str of last BTC check
         self._cooldown_until: dict[str, datetime] = {}   # symbol -> cooldown expiry after stop-loss
 
-        # Crypto-specific params
+        # ── Multi-level TP tracking ──
+        self._tp_levels: dict[str, list[tuple[float, Decimal]]] = {}  # symbol -> [(fraction, price)]
+        self._tp_level_hit: dict[str, int] = {}           # symbol -> how many TP levels hit
+        self._original_qty: dict[str, Decimal] = {}       # symbol -> original entry qty
+        self._breakeven_set: dict[str, bool] = {}         # symbol -> stop moved to breakeven?
+
+        # ── Fear & Greed cache ──
+        self._fear_greed_value: int | None = None
+        self._fear_greed_fetched: str = ""
+
+        # ── Daily trend cache ──
+        self._daily_trend_ok: dict[str, bool] = {}
+        self._daily_trend_checked: dict[str, str] = {}
+
+        # Crypto-specific params (base)
         self._rsi_oversold = float(getattr(settings, 'CRYPTO_RSI_OVERSOLD', 35.0))
         self._rsi_overbought = float(getattr(settings, 'CRYPTO_RSI_OVERBOUGHT', 75.0))
         self._volume_surge = float(getattr(settings, 'CRYPTO_VOLUME_SURGE', 1.5))
@@ -102,13 +132,35 @@ class CryptoSwingStrategy(BaseStrategy):
         self._btc_trend_gate = bool(getattr(settings, 'CRYPTO_BTC_TREND_GATE', True))
         self._fee_bps = float(getattr(settings, 'CRYPTO_FEE_BPS', 25.0))
 
+        # v2 params: ADX, Bollinger, MACD, multi-TP, Fear & Greed
+        self._adx_filter_enabled = bool(getattr(settings, 'CRYPTO_ADX_FILTER_ENABLED', True))
+        self._adx_min_trend = float(getattr(settings, 'CRYPTO_ADX_MIN_TREND', 20.0))
+        self._bb_filter_enabled = bool(getattr(settings, 'CRYPTO_BB_FILTER_ENABLED', True))
+        self._bb_period = int(getattr(settings, 'CRYPTO_BB_PERIOD', 20))
+        self._bb_std = float(getattr(settings, 'CRYPTO_BB_STD', 2.0))
+        self._macd_enabled = bool(getattr(settings, 'CRYPTO_MACD_ENABLED', True))
+        self._daily_trend_gate = bool(getattr(settings, 'CRYPTO_DAILY_TREND_GATE', True))
+        self._multi_tp_enabled = bool(getattr(settings, 'CRYPTO_MULTI_TP_ENABLED', True))
+        self._tp1_pct = float(getattr(settings, 'CRYPTO_TP1_PCT', 5.0))
+        self._tp2_pct = float(getattr(settings, 'CRYPTO_TP2_PCT', 8.0))
+        self._tp3_pct = float(getattr(settings, 'CRYPTO_TP3_PCT', 12.0))
+        self._dynamic_stops = bool(getattr(settings, 'CRYPTO_DYNAMIC_STOPS', True))
+        self._fear_greed_enabled = bool(getattr(settings, 'CRYPTO_FEAR_GREED_ENABLED', True))
+
         logger.info(
-            "[CRYPTO] Initialized: TP={:.1f}%, SL={:.1f}%, Trail +{:.1f}%/{:.1f}% | "
-            "RSI<{:.0f}, max_pos={}, risk/trade={:.1f}%, hold≤{}d | "
-            "equity_cap=${} | BTC_gate={} | fee={}bps | EOD_EXEMPT=True",
-            self._take_profit_pct, self._stop_loss_pct,
+            "[CRYPTO v2] Initialized: TP={:.1f}%/{:.1f}%/{:.1f}% (multi={}), "
+            "SL={:.1f}% (dynamic={}), Trail +{:.1f}%/{:.1f}% | "
+            "RSI<{:.0f}, ADX>{:.0f} (enabled={}), BB={}/{:.1f} (enabled={}), "
+            "MACD={}, DailyGate={}, F&G={} | "
+            "max_pos={}, risk/trade={:.1f}%, hold≤{}d | "
+            "equity_cap=${} | BTC_gate={} | fee={}bps",
+            self._tp1_pct, self._tp2_pct, self._tp3_pct, self._multi_tp_enabled,
+            self._stop_loss_pct, self._dynamic_stops,
             self._trailing_act_pct, self._trailing_offset_pct,
-            self._rsi_oversold, self._max_positions, self._risk_per_trade,
+            self._rsi_oversold, self._adx_min_trend, self._adx_filter_enabled,
+            self._bb_period, self._bb_std, self._bb_filter_enabled,
+            self._macd_enabled, self._daily_trend_gate, self._fear_greed_enabled,
+            self._max_positions, self._risk_per_trade,
             self._max_hold_days,
             int(self._equity_cap) if self._equity_cap else "disabled",
             self._btc_trend_gate, int(self._fee_bps),
@@ -190,6 +242,16 @@ class CryptoSwingStrategy(BaseStrategy):
                 self._eval_done[symbol] = eval_key
                 return orders
 
+        # ── Daily timeframe macro gate ───────────────────────────────────
+        if self._daily_trend_gate:
+            daily_ok = await self._check_daily_trend(symbol)
+            if not daily_ok:
+                logger.debug(
+                    "[CRYPTO] Daily trend gate BLOCKED {} — macro downtrend", symbol
+                )
+                self._eval_done[symbol] = eval_key
+                return orders
+
         # ── Fetch 4H bars and compute signals ────────────────────────────
         try:
             bars = await self._get_4h_bars(symbol)
@@ -200,7 +262,7 @@ class CryptoSwingStrategy(BaseStrategy):
             for col in ("open", "high", "low", "close", "volume"):
                 df[col] = df[col].astype(float)
 
-            confluence = self._compute_confluence(df, float(current_price))
+            confluence, details = self._compute_confluence(df, float(current_price))
 
             if confluence >= self._min_confluence:
                 entry_order = await self._create_entry_order(
@@ -209,13 +271,13 @@ class CryptoSwingStrategy(BaseStrategy):
                 if entry_order:
                     orders.append(entry_order)
                     logger.info(
-                        "[CRYPTO] ENTRY signal {} | confluence={}/{} | price={}",
-                        symbol, confluence, 6, current_price,
+                        "[CRYPTO] ENTRY signal {} | confluence={}/{} | price={} | {}",
+                        symbol, confluence, 9, current_price, ", ".join(details),
                     )
             else:
                 logger.debug(
                     "[CRYPTO] No entry for {} | confluence={}/{} (need {})",
-                    symbol, confluence, 6, self._min_confluence,
+                    symbol, confluence, 9, self._min_confluence,
                 )
 
         except Exception as exc:
@@ -245,36 +307,95 @@ class CryptoSwingStrategy(BaseStrategy):
             self._entry_dates[symbol] = datetime.now(timezone.utc)
             self._swing_highs[symbol] = entry_price
             self._trailing_active[symbol] = False
+            self._original_qty[symbol] = qty
+            self._tp_level_hit[symbol] = 0
+            self._breakeven_set[symbol] = False
 
-            # Set stop loss and take profit levels
-            sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
-            tp_price = entry_price * Decimal(str(1 + self._take_profit_pct / 100))
+            # ── Dynamic ATR-based stop loss ──────────────────────────────
+            if self._dynamic_stops:
+                try:
+                    bars = self._bar_cache.get(symbol, [])
+                    if len(bars) >= 15:
+                        df = pd.DataFrame(bars)
+                        for col in ("open", "high", "low", "close", "volume"):
+                            df[col] = df[col].astype(float)
+                        atr = self._calc_atr(df, 14)
+                        if atr is not None and float(entry_price) > 0:
+                            vol_ratio = atr / float(entry_price)
+                            dynamic_sl = max(0.03, min(0.07, vol_ratio * 2)) * 100
+                            sl_price = entry_price * Decimal(str(1 - dynamic_sl / 100))
+                            logger.info(
+                                "[CRYPTO] Dynamic SL: ATR={:.0f}, vol_ratio={:.4f}, "
+                                "SL={:.2f}% → ${}",
+                                atr, vol_ratio, dynamic_sl, sl_price,
+                            )
+                        else:
+                            sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                    else:
+                        sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+                except Exception:
+                    sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+            else:
+                sl_price = entry_price * Decimal(str(1 - self._stop_loss_pct / 100))
+
             self._swing_stops[symbol] = sl_price
-            self._swing_targets[symbol] = tp_price
+
+            # ── Multi-level take profit setup ────────────────────────────
+            if self._multi_tp_enabled:
+                tp1 = entry_price * Decimal(str(1 + self._tp1_pct / 100))
+                tp2 = entry_price * Decimal(str(1 + self._tp2_pct / 100))
+                tp3 = entry_price * Decimal(str(1 + self._tp3_pct / 100))
+                self._tp_levels[symbol] = [
+                    (0.33, tp1),   # Take 33% at TP1
+                    (0.33, tp2),   # Take 33% at TP2
+                    (0.34, tp3),   # Take 34% at TP3
+                ]
+                final_tp = tp3
+                logger.info(
+                    "[CRYPTO] Multi-TP: TP1=${} (+{:.1f}%), TP2=${} (+{:.1f}%), "
+                    "TP3=${} (+{:.1f}%)",
+                    tp1, self._tp1_pct, tp2, self._tp2_pct, tp3, self._tp3_pct,
+                )
+            else:
+                tp_price = entry_price * Decimal(str(1 + self._take_profit_pct / 100))
+                final_tp = tp_price
+
+            self._swing_targets[symbol] = final_tp
 
             logger.info(
                 "[CRYPTO] Position OPENED {} | entry={} qty={} | "
-                "SL={} ({:.1f}%) TP={} ({:.1f}%)",
+                "SL={} TP={} | dynamic_sl={} multi_tp={}",
                 symbol, entry_price, qty,
-                sl_price, self._stop_loss_pct,
-                tp_price, self._take_profit_pct,
+                sl_price, final_tp,
+                self._dynamic_stops, self._multi_tp_enabled,
             )
 
         elif side == "SELL":
-            # Exit fill — close position
+            # Exit fill — reduce/close position
             pos = self.positions.get(symbol)
             if pos and not pos.is_closed:
                 exit_price = order.price
-                pnl = pos.reduce_position(pos.quantity, exit_price)
-                self._cleanup_symbol(symbol)
+                exit_qty = order.filled_quantity if order.filled_quantity > 0 else order.quantity
+                pnl = pos.reduce_position(exit_qty, exit_price)
 
-                pnl_pct = ((exit_price / pos.entry_price) - 1) * 100
-                logger.info(
-                    "[CRYPTO] Position CLOSED {} | entry={} exit={} | "
-                    "PnL=${:.2f} ({:.2f}%)",
-                    symbol, pos.entry_price, exit_price,
-                    float(pnl), float(pnl_pct),
-                )
+                pnl_pct = ((exit_price / pos.entry_price) - 1) * 100 if pos.entry_price > 0 else Decimal("0")
+
+                if pos.is_closed:
+                    # Fully closed — cleanup
+                    self._cleanup_symbol(symbol)
+                    logger.info(
+                        "[CRYPTO] Position CLOSED {} | entry={} exit={} | "
+                        "PnL=${:.2f} ({:.2f}%)",
+                        symbol, pos.entry_price, exit_price,
+                        float(pnl), float(pnl_pct),
+                    )
+                else:
+                    # Partial exit (multi-TP)
+                    logger.info(
+                        "[CRYPTO] Partial exit {} | sold {} @ {} | "
+                        "remaining={} | PnL=${:.2f}",
+                        symbol, exit_qty, exit_price, pos.quantity, float(pnl),
+                    )
 
         return []
 
@@ -329,20 +450,72 @@ class CryptoSwingStrategy(BaseStrategy):
                 "[CRYPTO] STOP LOSS hit {} | price={} <= stop={} | PnL={:.2f}%",
                 symbol, current_price, stop_price, float(pnl_pct),
             )
-            # 6-bar (24h) cooldown after stop-loss to avoid churning
+            # 24h cooldown after stop-loss to avoid churning
             self._cooldown_until[symbol] = datetime.now(timezone.utc) + timedelta(hours=24)
             orders.append(self._create_exit_order(symbol, pos, "stop_loss"))
             return orders
 
-        # ── 2. Take Profit ───────────────────────────────────────────────
-        target_price = self._swing_targets.get(symbol, Decimal("999999"))
-        if current_price >= target_price:
-            logger.info(
-                "[CRYPTO] TAKE PROFIT hit {} | price={} >= target={} | PnL={:.2f}%",
-                symbol, current_price, target_price, float(pnl_pct),
-            )
-            orders.append(self._create_exit_order(symbol, pos, "take_profit"))
-            return orders
+        # ── 2. Multi-Level Take Profit ───────────────────────────────────
+        if self._multi_tp_enabled and symbol in self._tp_levels:
+            tp_levels = self._tp_levels[symbol]
+            level_hit = self._tp_level_hit.get(symbol, 0)
+
+            if level_hit < len(tp_levels):
+                fraction, tp_price = tp_levels[level_hit]
+                if current_price >= tp_price:
+                    original_qty = self._original_qty.get(symbol, pos.quantity)
+                    sell_qty = Decimal(str(float(original_qty) * fraction))
+                    sell_qty = max(sell_qty, Decimal("0.000001"))
+
+                    # Don't sell more than we have
+                    if sell_qty > pos.quantity:
+                        sell_qty = pos.quantity
+
+                    # Check if this is the last level or remaining qty is tiny
+                    remaining_after = pos.quantity - sell_qty
+                    is_final = (level_hit >= len(tp_levels) - 1) or (
+                        remaining_after * current_price < Decimal("1")
+                    )
+                    if is_final:
+                        sell_qty = pos.quantity  # Close entire remaining
+
+                    logger.info(
+                        "[CRYPTO] TP{} hit {} | price={} >= {} | "
+                        "selling {}/{} ({:.0f}%) | PnL={:.2f}%",
+                        level_hit + 1, symbol, current_price, tp_price,
+                        sell_qty, pos.quantity, float(fraction) * 100,
+                        float(pnl_pct),
+                    )
+
+                    self._tp_level_hit[symbol] = level_hit + 1
+
+                    # Move stop to breakeven after first TP hit
+                    if level_hit == 0 and not self._breakeven_set.get(symbol, False):
+                        # Breakeven = entry + fees (0.5% round trip)
+                        breakeven = entry_price * Decimal("1.005")
+                        if breakeven > stop_price:
+                            self._swing_stops[symbol] = breakeven
+                            self._breakeven_set[symbol] = True
+                            logger.info(
+                                "[CRYPTO] Stop moved to BREAKEVEN {} → {}",
+                                symbol, breakeven,
+                            )
+
+                    orders.append(self._create_exit_order(
+                        symbol, pos, f"tp{level_hit + 1}", sell_qty
+                    ))
+                    return orders
+
+        # ── 2b. Single Take Profit (fallback if multi-TP disabled or no levels set)
+        if not self._multi_tp_enabled or symbol not in self._tp_levels:
+            target_price = self._swing_targets.get(symbol, Decimal("999999"))
+            if current_price >= target_price:
+                logger.info(
+                    "[CRYPTO] TAKE PROFIT hit {} | price={} >= target={} | PnL={:.2f}%",
+                    symbol, current_price, target_price, float(pnl_pct),
+                )
+                orders.append(self._create_exit_order(symbol, pos, "take_profit"))
+                return orders
 
         # ── 3. Trailing Stop ─────────────────────────────────────────────
         trailing_activation = entry_price * Decimal(str(1 + self._trailing_act_pct / 100))
@@ -387,11 +560,25 @@ class CryptoSwingStrategy(BaseStrategy):
 
     # ── Signal Computation ────────────────────────────────────────────────────
 
-    def _compute_confluence(self, df: pd.DataFrame, current_price: float) -> int:
-        """Compute entry confluence score (0-6) from 4H bars."""
+    def _compute_confluence(self, df: pd.DataFrame, current_price: float) -> tuple[int, list[str]]:
+        """Compute entry confluence score (0-10) from 4H bars.
+
+        Returns (score, list_of_signal_names) for logging.
+        Includes ADX gate (returns 0 if choppy market).
+        """
         confluence = 0
+        details: list[str] = []
 
         try:
+            # ── ADX GATE — skip choppy markets ───────────────────────────
+            if self._adx_filter_enabled:
+                adx = self._calc_adx(df, 14)
+                if adx is not None and adx < self._adx_min_trend:
+                    logger.debug("[CRYPTO] ADX gate: {:.1f} < {:.0f} — SKIP (choppy)", adx, self._adx_min_trend)
+                    return 0, ["ADX_BLOCKED"]
+                if adx is not None:
+                    details.append(f"ADX={adx:.1f}")
+
             # 1. RSI oversold bounce
             rsi = self._calc_rsi(df, period=14)
             if rsi is not None and rsi < self._rsi_oversold:
@@ -399,7 +586,7 @@ class CryptoSwingStrategy(BaseStrategy):
                 rsi_series = df['close'].diff()
                 if len(rsi_series) > 2 and rsi_series.iloc[-1] > 0:
                     confluence += 1
-                    logger.debug("[CRYPTO] Signal: RSI oversold bounce ({:.1f})", rsi)
+                    details.append(f"RSI_bounce={rsi:.1f}")
 
             # 2. Price near 20-EMA support
             ema20 = self._calc_ema(df, 20)
@@ -409,25 +596,30 @@ class CryptoSwingStrategy(BaseStrategy):
                 atr_distance = (atr / current_price * 100) * 1.5 if atr else 3.0
                 if distance_pct <= atr_distance and current_price >= ema20 * 0.98:
                     confluence += 1
-                    logger.debug("[CRYPTO] Signal: Near 20-EMA ({:.2f}% away)", distance_pct)
+                    details.append(f"EMA20_support={distance_pct:.2f}%")
 
-            # 3. Volume surge
+            # 3. Volume surge (tiered: 3x = +2, 1.5x = +1)
             avg_vol = self._avg_volume(df, 20)
             current_vol = float(df['volume'].iloc[-1])
-            if avg_vol > 0 and current_vol > avg_vol * self._volume_surge:
-                confluence += 1
-                logger.debug("[CRYPTO] Signal: Volume surge ({:.1f}x)", current_vol / avg_vol)
+            if avg_vol > 0:
+                vol_ratio = current_vol / avg_vol
+                if vol_ratio > 3.0:
+                    confluence += 2
+                    details.append(f"VOL_massive={vol_ratio:.1f}x")
+                elif vol_ratio > self._volume_surge:
+                    confluence += 1
+                    details.append(f"VOL_surge={vol_ratio:.1f}x")
 
             # 4. Bullish candle
             if self._is_bullish_candle(df):
                 confluence += 1
-                logger.debug("[CRYPTO] Signal: Bullish candle pattern")
+                details.append("BULLISH_candle")
 
             # 5. EMA stack (20 > 50 = uptrend)
             ema50 = self._calc_ema(df, 50)
             if ema20 is not None and ema50 is not None and ema20 > ema50:
                 confluence += 1
-                logger.debug("[CRYPTO] Signal: EMA stack bullish (20 > 50)")
+                details.append("EMA_stack_bull")
 
             # 6. Price recovering from recent low (momentum shift)
             if len(df) >= 10:
@@ -437,15 +629,36 @@ class CryptoSwingStrategy(BaseStrategy):
                     position_in_range = (current_price - recent_low) / (recent_high - recent_low)
                     if 0.4 <= position_in_range <= 0.7:
                         confluence += 1
-                        logger.debug(
-                            "[CRYPTO] Signal: Recovery from low ({:.0%} of range)",
-                            position_in_range,
-                        )
+                        details.append(f"recovery={position_in_range:.0%}")
+
+            # 7. Bollinger Band — price in lower half
+            if self._bb_filter_enabled:
+                bb_upper, bb_middle, bb_lower = self._calc_bollinger(
+                    df, self._bb_period, self._bb_std
+                )
+                if bb_middle is not None and current_price <= bb_middle:
+                    confluence += 1
+                    details.append("BB_lower_half")
+
+            # 8. MACD histogram rising
+            if self._macd_enabled:
+                macd_line, signal_line, histogram = self._calc_macd(df, 12, 26, 9)
+                if histogram is not None and len(histogram) >= 2:
+                    if histogram[-1] > histogram[-2]:
+                        confluence += 1
+                        details.append(f"MACD_rising={histogram[-1]:.2f}")
+
+            # 9. RSI bullish divergence
+            if rsi is not None:
+                divergence = self._detect_rsi_divergence(df, lookback=10)
+                if divergence == "bullish":
+                    confluence += 1
+                    details.append("RSI_bull_diverge")
 
         except Exception as exc:
             logger.debug("[CRYPTO] Confluence calculation error: {}", exc)
 
-        return confluence
+        return confluence, details
 
     # ── Entry / Exit Order Creation ───────────────────────────────────────────
 
@@ -480,14 +693,16 @@ class CryptoSwingStrategy(BaseStrategy):
             return None
 
     def _create_exit_order(
-        self, symbol: str, pos: Position, reason: str
+        self, symbol: str, pos: Position, reason: str,
+        quantity: Decimal | None = None,
     ) -> Order:
-        """Create a market sell order to exit the position."""
+        """Create a market sell order to exit (full or partial) the position."""
+        qty = quantity if quantity is not None else pos.quantity
         order = Order(
             symbol=symbol,
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
-            quantity=pos.quantity,
+            quantity=qty,
             price=pos.current_price if hasattr(pos, "current_price") else pos.entry_price,
             strategy=self.name,
         )
@@ -499,6 +714,7 @@ class CryptoSwingStrategy(BaseStrategy):
         """Calculate position size for crypto — risk-based with fee adjustment.
 
         Accounts for Alpaca's 25 bps taker fee on both entry and exit.
+        Adjusts for Fear & Greed sentiment (extreme fear = bigger, extreme greed = smaller).
         """
         try:
             balances = await self.exchange.get_account_balance()
@@ -520,6 +736,23 @@ class CryptoSwingStrategy(BaseStrategy):
             effective_risk = stop_distance_pct + fee_pct
 
             position_usd = risk_amount / effective_risk
+
+            # ── Fear & Greed adjustment ──────────────────────────────────
+            if self._fear_greed_enabled:
+                fg = await self._get_fear_greed()
+                if fg is not None:
+                    if fg < 25:
+                        # Extreme Fear = best time to buy, increase size 25%
+                        position_usd *= 1.25
+                        logger.debug("[CRYPTO] F&G={} (Extreme Fear) → size +25%", fg)
+                    elif fg > 75:
+                        # Extreme Greed = risky, cut size 50%
+                        position_usd *= 0.50
+                        logger.debug("[CRYPTO] F&G={} (Extreme Greed) → size -50%", fg)
+                    elif fg > 60:
+                        # Greed = slightly reduce
+                        position_usd *= 0.75
+                        logger.debug("[CRYPTO] F&G={} (Greed) → size -25%", fg)
 
             # Cap at 50% of equity (leave room for other positions)
             max_position = equity * 0.50
@@ -618,6 +851,111 @@ class CryptoSwingStrategy(BaseStrategy):
             logger.warning("[CRYPTO] Bar fetch failed for {}: {}", symbol, exc)
             return self._bar_cache.get(symbol, [])
 
+    async def _get_daily_bars(self, symbol: str) -> list[dict]:
+        """Fetch and cache daily bars. Refresh every 4 hours."""
+        now = datetime.now(timezone.utc)
+        last_fetch = self._last_daily_fetch.get(symbol)
+
+        if (
+            last_fetch
+            and (now - last_fetch).total_seconds() < 14400
+            and symbol in self._daily_cache
+            and len(self._daily_cache[symbol]) >= 20
+        ):
+            return self._daily_cache[symbol]
+
+        try:
+            bars = await self.exchange.get_klines(symbol, "1d", 60)
+            if bars:
+                self._daily_cache[symbol] = bars
+                self._last_daily_fetch[symbol] = now
+                logger.debug("[CRYPTO] Fetched {} daily bars for {}", len(bars), symbol)
+            return bars or []
+        except Exception as exc:
+            logger.warning("[CRYPTO] Daily bar fetch failed for {}: {}", symbol, exc)
+            return self._daily_cache.get(symbol, [])
+
+    # ── Daily Trend Gate ──────────────────────────────────────────────────────
+
+    async def _check_daily_trend(self, symbol: str) -> bool:
+        """Check if the symbol's daily trend is bullish.
+
+        Gate: daily EMA20 > EMA50 AND daily RSI > 45 → allow longs.
+        Cached for 4 hours.
+        """
+        now = datetime.now(timezone.utc)
+        check_key = f"{now.strftime('%Y-%m-%d')}-{(now.hour // 4) * 4:02d}"
+
+        if self._daily_trend_checked.get(symbol) == check_key:
+            return self._daily_trend_ok.get(symbol, True)
+
+        try:
+            bars = await self._get_daily_bars(symbol)
+            if len(bars) < 50:
+                self._daily_trend_ok[symbol] = True  # Fail-open
+                self._daily_trend_checked[symbol] = check_key
+                return True
+
+            df = pd.DataFrame(bars)
+            for col in ("open", "high", "low", "close", "volume"):
+                df[col] = df[col].astype(float)
+
+            ema20 = self._calc_ema(df, 20)
+            ema50 = self._calc_ema(df, 50)
+            rsi = self._calc_rsi(df, 14)
+
+            if ema20 is not None and ema50 is not None and rsi is not None:
+                ok = ema20 > ema50 and rsi > 45
+                self._daily_trend_ok[symbol] = ok
+                logger.info(
+                    "[CRYPTO] Daily trend {} for {}: EMA20={:.0f} vs EMA50={:.0f}, RSI={:.1f}",
+                    "BULLISH" if ok else "BEARISH", symbol,
+                    ema20, ema50, rsi,
+                )
+            else:
+                self._daily_trend_ok[symbol] = True  # Fail-open
+
+            self._daily_trend_checked[symbol] = check_key
+            return self._daily_trend_ok[symbol]
+
+        except Exception as exc:
+            logger.warning("[CRYPTO] Daily trend check error for {}: {} — fail-open", symbol, exc)
+            self._daily_trend_ok[symbol] = True
+            self._daily_trend_checked[symbol] = check_key
+            return True
+
+    # ── Fear & Greed Index ────────────────────────────────────────────────────
+
+    async def _get_fear_greed(self) -> int | None:
+        """Fetch the crypto Fear & Greed Index (0-100).
+
+        Cached for 4 hours. Returns None on failure (non-blocking).
+        """
+        now = datetime.now(timezone.utc)
+        check_key = f"{now.strftime('%Y-%m-%d')}-{(now.hour // 4) * 4:02d}"
+
+        if self._fear_greed_fetched == check_key and self._fear_greed_value is not None:
+            return self._fear_greed_value
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://api.alternative.me/fng/?limit=1",
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        value = int(data["data"][0]["value"])
+                        self._fear_greed_value = value
+                        self._fear_greed_fetched = check_key
+                        logger.info("[CRYPTO] Fear & Greed Index: {} ({})",
+                                    value, data["data"][0].get("value_classification", ""))
+                        return value
+        except Exception as exc:
+            logger.debug("[CRYPTO] Fear & Greed fetch failed: {} — using cached", exc)
+
+        return self._fear_greed_value
+
     # ── Technical Indicator Helpers ───────────────────────────────────────────
 
     @staticmethod
@@ -656,6 +994,175 @@ class CryptoSwingStrategy(BaseStrategy):
             (low - close).abs(),
         ], axis=1).max(axis=1)
         return float(tr.rolling(period).mean().iloc[-1])
+
+    @staticmethod
+    def _calc_adx(df: pd.DataFrame, period: int = 14) -> float | None:
+        """Calculate Average Directional Index (ADX).
+
+        ADX > 25 = trending market, ADX < 20 = choppy/ranging.
+        """
+        if len(df) < period * 2:
+            return None
+
+        high = df['high'].values.astype(float)
+        low = df['low'].values.astype(float)
+        close = df['close'].values.astype(float)
+
+        # True Range
+        tr = np.zeros(len(df))
+        tr[0] = high[0] - low[0]
+        for i in range(1, len(df)):
+            tr[i] = max(
+                high[i] - low[i],
+                abs(high[i] - close[i - 1]),
+                abs(low[i] - close[i - 1]),
+            )
+
+        # Directional Movement
+        plus_dm = np.zeros(len(df))
+        minus_dm = np.zeros(len(df))
+        for i in range(1, len(df)):
+            up_move = high[i] - high[i - 1]
+            down_move = low[i - 1] - low[i]
+            if up_move > down_move and up_move > 0:
+                plus_dm[i] = up_move
+            if down_move > up_move and down_move > 0:
+                minus_dm[i] = down_move
+
+        # Smoothed averages (Wilder's smoothing)
+        atr = np.zeros(len(df))
+        plus_di_arr = np.zeros(len(df))
+        minus_di_arr = np.zeros(len(df))
+
+        atr[period] = np.mean(tr[1:period + 1])
+        smooth_plus = np.mean(plus_dm[1:period + 1])
+        smooth_minus = np.mean(minus_dm[1:period + 1])
+
+        for i in range(period + 1, len(df)):
+            atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+            smooth_plus = (smooth_plus * (period - 1) + plus_dm[i]) / period
+            smooth_minus = (smooth_minus * (period - 1) + minus_dm[i]) / period
+
+            if atr[i] > 0:
+                plus_di_arr[i] = (smooth_plus / atr[i]) * 100
+                minus_di_arr[i] = (smooth_minus / atr[i]) * 100
+
+        # DX and ADX
+        dx = np.zeros(len(df))
+        for i in range(period, len(df)):
+            di_sum = plus_di_arr[i] + minus_di_arr[i]
+            if di_sum > 0:
+                dx[i] = abs(plus_di_arr[i] - minus_di_arr[i]) / di_sum * 100
+
+        # ADX = smoothed DX
+        adx_start = period * 2
+        if adx_start >= len(df):
+            return None
+
+        adx_val = np.mean(dx[period:adx_start])
+        for i in range(adx_start, len(df)):
+            adx_val = (adx_val * (period - 1) + dx[i]) / period
+
+        return float(adx_val)
+
+    @staticmethod
+    def _calc_bollinger(
+        df: pd.DataFrame, period: int = 20, num_std: float = 2.0
+    ) -> tuple[float | None, float | None, float | None]:
+        """Calculate Bollinger Bands (upper, middle, lower)."""
+        if len(df) < period:
+            return None, None, None
+
+        closes = df['close'].astype(float)
+        middle = float(closes.rolling(period).mean().iloc[-1])
+        std = float(closes.rolling(period).std().iloc[-1])
+        upper = middle + num_std * std
+        lower = middle - num_std * std
+        return upper, middle, lower
+
+    @staticmethod
+    def _calc_macd(
+        df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9
+    ) -> tuple[float | None, float | None, list[float] | None]:
+        """Calculate MACD line, signal line, and histogram series."""
+        if len(df) < slow + signal:
+            return None, None, None
+
+        closes = df['close'].astype(float)
+        ema_fast = closes.ewm(span=fast, adjust=False).mean()
+        ema_slow = closes.ewm(span=slow, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+        histogram = macd_line - signal_line
+
+        return (
+            float(macd_line.iloc[-1]),
+            float(signal_line.iloc[-1]),
+            histogram.values.tolist(),
+        )
+
+    @staticmethod
+    def _detect_rsi_divergence(df: pd.DataFrame, lookback: int = 10) -> str | None:
+        """Detect bullish/bearish RSI divergence.
+
+        Bullish: price makes lower low, RSI makes higher low.
+        Returns 'bullish', 'bearish', or None.
+        """
+        if len(df) < lookback + 14:
+            return None
+
+        closes = df['close'].astype(float)
+        lows = df['low'].astype(float)
+
+        # Calculate RSI series
+        delta = closes.diff()
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        avg_gain = gain.rolling(14).mean()
+        avg_loss = loss.rolling(14).mean()
+        rs = avg_gain / avg_loss.replace(0, 1e-10)
+        rsi_series = 100 - (100 / (1 + rs))
+
+        # Look for swing lows in last `lookback` bars
+        recent_lows = lows.tail(lookback)
+        recent_rsi = rsi_series.tail(lookback)
+
+        if len(recent_lows) < 4:
+            return None
+
+        # Find two lowest points (simple approach: split in half)
+        half = len(recent_lows) // 2
+        first_half_low_idx = recent_lows.iloc[:half].idxmin()
+        second_half_low_idx = recent_lows.iloc[half:].idxmin()
+
+        if first_half_low_idx == second_half_low_idx:
+            return None
+
+        price_low1 = lows.loc[first_half_low_idx]
+        price_low2 = lows.loc[second_half_low_idx]
+        rsi_low1 = rsi_series.loc[first_half_low_idx]
+        rsi_low2 = rsi_series.loc[second_half_low_idx]
+
+        # Bullish divergence: price lower-low, RSI higher-low
+        if price_low2 < price_low1 and rsi_low2 > rsi_low1:
+            return "bullish"
+
+        # Bearish divergence: price higher-high, RSI lower-high (using highs)
+        highs = df['high'].astype(float)
+        recent_highs = highs.tail(lookback)
+        first_half_high_idx = recent_highs.iloc[:half].idxmax()
+        second_half_high_idx = recent_highs.iloc[half:].idxmax()
+
+        if first_half_high_idx != second_half_high_idx:
+            price_high1 = highs.loc[first_half_high_idx]
+            price_high2 = highs.loc[second_half_high_idx]
+            rsi_high1 = rsi_series.loc[first_half_high_idx]
+            rsi_high2 = rsi_series.loc[second_half_high_idx]
+
+            if price_high2 > price_high1 and rsi_high2 < rsi_high1:
+                return "bearish"
+
+        return None
 
     @staticmethod
     def _avg_volume(df: pd.DataFrame, period: int = 20) -> float:
@@ -702,6 +1209,10 @@ class CryptoSwingStrategy(BaseStrategy):
         self._swing_targets.pop(symbol, None)
         self._trailing_active.pop(symbol, None)
         self._eval_done.pop(symbol, None)
+        self._tp_levels.pop(symbol, None)
+        self._tp_level_hit.pop(symbol, None)
+        self._original_qty.pop(symbol, None)
+        self._breakeven_set.pop(symbol, None)
         # NOTE: intentionally NOT clearing _cooldown_until here —
         # cooldown must persist after position cleanup so the bot
         # waits before re-entering the same symbol.
