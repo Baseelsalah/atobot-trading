@@ -20,6 +20,7 @@ from src.scanner.market_scanner import MarketScanner
 from src.scanner.news_intel import NewsIntelligence
 from src.scanner.regime_detector import MarketRegimeDetector
 from src.strategies.base_strategy import BaseStrategy
+from src.strategies.crypto_strategy import CryptoSwingStrategy
 from src.strategies.ema_pullback_strategy import EMAPullbackStrategy
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.orb_strategy import ORBStrategy
@@ -91,6 +92,15 @@ class AtoBot:
         self.strategies = self._create_strategies()
         strategy_names = [s.name for s in self.strategies]
         logger.info("Active strategies: {}", strategy_names)
+
+        # ── Merge crypto symbols into SYMBOLS list if crypto_swing is active ──
+        if getattr(self.settings, 'CRYPTO_ENABLED', False) and "crypto_swing" in self.settings.STRATEGIES:
+            crypto_syms = [s.strip() for s in self.settings.CRYPTO_SYMBOLS.split(",") if s.strip()]
+            existing = set(self.settings.SYMBOLS)
+            added = [s for s in crypto_syms if s not in existing]
+            if added:
+                self.settings.SYMBOLS = list(self.settings.SYMBOLS) + added
+                logger.info("Crypto symbols merged: {} (total symbols: {})", added, len(self.settings.SYMBOLS))
 
         # Notifier
         if self.settings.NOTIFICATIONS_ENABLED:
@@ -294,6 +304,7 @@ class AtoBot:
             "ema_pullback": EMAPullbackStrategy,
             "pairs": PairsTradingStrategy,
             "swing": SwingStrategy,
+            "crypto_swing": CryptoSwingStrategy,
         }
         strategies = []
         for name in self.settings.STRATEGIES:

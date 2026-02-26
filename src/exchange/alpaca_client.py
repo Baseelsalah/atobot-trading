@@ -1,12 +1,17 @@
-"""Alpaca exchange client for AtoBot — **stock day trading**.
+"""Alpaca exchange client for AtoBot — **stock + crypto trading**.
 
 Uses the alpaca-py SDK for:
 - Paper / live equity trading via ``TradingClient``
 - Historical & real-time stock market data via ``StockHistoricalDataClient``
-- **WebSocket streaming** via ``StockDataStream`` (real-time price/bar/halt)
+- Historical & real-time crypto market data via ``CryptoHistoricalDataClient``
+- **WebSocket streaming** via ``StockDataStream`` + ``CryptoDataStream``
 - **Trade updates streaming** via ``TradingStream`` (order fills/rejects)
 - **Market calendar** for schedule-aware sleep/wake
 - **News streaming** via ``NewsDataStream`` (optional, for AI advisor)
+
+Crypto symbols use ``/`` separator (e.g. ``BTC/USD``, ``ETH/USD``) and
+route automatically to the crypto data pipeline.  Orders use ``GTC``
+time-in-force (crypto markets are 24/7).
 
 All order helpers follow the ``BaseExchangeClient`` interface so the rest
 of the bot is exchange-agnostic.
@@ -179,26 +184,33 @@ class NewsEventQueue:
 # ── Main Client ───────────────────────────────────────────────────────────────
 
 class AlpacaClient(BaseExchangeClient):
-    """Alpaca exchange adapter for **equities** (stocks).
+    """Alpaca exchange adapter for **equities + crypto**.
 
     Supports two operational modes:
     - **Polling** (legacy): REST calls every N seconds.
     - **Streaming** (new, preferred): WebSocket for prices, order events,
       halt detection, and news. Falls back to REST when needed.
+
+    Crypto symbols (containing ``/``) automatically route to the crypto
+    data pipeline (``CryptoHistoricalDataClient``, ``CryptoDataStream``)
+    and use ``GTC`` time-in-force instead of ``DAY``.
     """
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._trading_client: Any | None = None
         self._data_client: Any | None = None
+        self._crypto_data_client: Any | None = None   # CryptoHistoricalDataClient
         self._symbol_filters: dict[str, dict] = {}
         self._rate_limiter = _RateLimiter(max_calls=190, window_seconds=60.0)
 
         # ── Streaming infrastructure ──────────────────────────────────────
         self._stock_stream: Any | None = None       # StockDataStream
+        self._crypto_stream: Any | None = None      # CryptoDataStream
         self._trading_stream: Any | None = None      # TradingStream
         self._news_stream: Any | None = None         # NewsDataStream
         self._stream_thread: threading.Thread | None = None
+        self._crypto_stream_thread: threading.Thread | None = None
         self._trade_stream_thread: threading.Thread | None = None
         self._news_stream_thread: threading.Thread | None = None
 
@@ -245,6 +257,19 @@ class AlpacaClient(BaseExchangeClient):
                 secret_key=api_secret,
             )
 
+            # ── Crypto data client (separate from stock data) ─────────────
+            try:
+                from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+
+                self._crypto_data_client = CryptoHistoricalDataClient(
+                    api_key=api_key,
+                    secret_key=api_secret,
+                )
+                logger.info("CryptoHistoricalDataClient initialized")
+            except Exception as exc:
+                logger.warning("Could not init CryptoHistoricalDataClient: {}", exc)
+                self._crypto_data_client = None
+
             # Verify connectivity
             account = self._trading_client.get_account()
             mode = "PAPER" if paper else "LIVE"
@@ -269,18 +294,32 @@ class AlpacaClient(BaseExchangeClient):
         """Start all WebSocket streams (call after connect()).
 
         Launched in background threads so they don't block the async engine.
+        Stock and crypto symbols are separated and routed to their respective
+        WebSocket endpoints.
         """
         api_key = self._settings.ALPACA_API_KEY
         api_secret = self._settings.ALPACA_API_SECRET
 
-        if self._streaming_enabled:
-            await self._start_stock_stream(symbols, api_key, api_secret)
+        # Split symbols by asset class
+        stock_symbols = [s for s in symbols if not self._is_crypto(s)]
+        crypto_symbols = [s for s in symbols if self._is_crypto(s)]
+
+        if self._streaming_enabled and stock_symbols:
+            await self._start_stock_stream(stock_symbols, api_key, api_secret)
+
+        if self._streaming_enabled and crypto_symbols:
+            await self._start_crypto_stream(crypto_symbols, api_key, api_secret)
 
         if self._trade_stream_enabled:
             await self._start_trading_stream(api_key, api_secret)
 
-        if self._news_stream_enabled:
-            await self._start_news_stream(symbols, api_key, api_secret)
+        if self._news_stream_enabled and stock_symbols:
+            await self._start_news_stream(stock_symbols, api_key, api_secret)
+
+    @staticmethod
+    def _is_crypto(symbol: str) -> bool:
+        """Return True if the symbol is a crypto trading pair (e.g. BTC/USD)."""
+        return "/" in symbol
 
     async def _start_stock_stream(
         self, symbols: list[str], api_key: str, api_secret: str
@@ -365,6 +404,70 @@ class AlpacaClient(BaseExchangeClient):
                 "Could not start StockDataStream (falling back to polling): {}", exc
             )
             self._streaming_enabled = False
+
+    async def _start_crypto_stream(
+        self, symbols: list[str], api_key: str, api_secret: str
+    ) -> None:
+        """Start the CryptoDataStream in a background thread for crypto symbols."""
+        try:
+            from alpaca.data.live.crypto import CryptoDataStream
+
+            self._crypto_stream = CryptoDataStream(
+                api_key=api_key,
+                secret_key=api_secret,
+                websocket_params={
+                    "ping_interval": 10,
+                    "ping_timeout": 180,
+                    "max_queue": 1024,
+                },
+            )
+
+            # Handler: real-time crypto trade events → price cache
+            async def _on_crypto_trade(data):
+                try:
+                    symbol = str(data.symbol)
+                    price = Decimal(str(data.price))
+                    self.price_cache.update(symbol, price)
+                except Exception as exc:
+                    logger.debug("Crypto stream trade handler error: {}", exc)
+
+            # Handler: crypto bar events → bar cache
+            async def _on_crypto_bar(data):
+                try:
+                    symbol = str(data.symbol)
+                    self.bar_cache.update(symbol, {
+                        "timestamp": int(data.timestamp.timestamp() * 1000),
+                        "open": Decimal(str(data.open)),
+                        "high": Decimal(str(data.high)),
+                        "low": Decimal(str(data.low)),
+                        "close": Decimal(str(data.close)),
+                        "volume": Decimal(str(data.volume)),
+                    })
+                except Exception as exc:
+                    logger.debug("Crypto stream bar handler error: {}", exc)
+
+            self._crypto_stream.subscribe_trades(_on_crypto_trade, *symbols)
+            self._crypto_stream.subscribe_bars(_on_crypto_bar, *symbols)
+
+            def _run_crypto_stream():
+                try:
+                    self._crypto_stream.run()
+                except Exception as exc:
+                    logger.error("CryptoDataStream crashed: {}", exc)
+
+            self._crypto_stream_thread = threading.Thread(
+                target=_run_crypto_stream, daemon=True, name="alpaca-crypto-stream"
+            )
+            self._crypto_stream_thread.start()
+            logger.info(
+                "CryptoDataStream started | symbols={}",
+                symbols,
+            )
+
+        except Exception as exc:
+            logger.warning(
+                "Could not start CryptoDataStream (falling back to polling): {}", exc
+            )
 
     async def _start_trading_stream(self, api_key: str, api_secret: str) -> None:
         """Start the TradingStream for order fill/reject events."""
@@ -484,6 +587,7 @@ class AlpacaClient(BaseExchangeClient):
         # Stop WebSocket streams
         for stream, name in [
             (self._stock_stream, "StockDataStream"),
+            (self._crypto_stream, "CryptoDataStream"),
             (self._trading_stream, "TradingStream"),
             (self._news_stream, "NewsDataStream"),
         ]:
@@ -495,13 +599,18 @@ class AlpacaClient(BaseExchangeClient):
                     logger.debug("Error stopping {}: {}", name, exc)
 
         # Wait for threads to finish
-        for thread in [self._stream_thread, self._trade_stream_thread, self._news_stream_thread]:
+        for thread in [
+            self._stream_thread, self._crypto_stream_thread,
+            self._trade_stream_thread, self._news_stream_thread,
+        ]:
             if thread is not None and thread.is_alive():
                 thread.join(timeout=5)
 
         self._trading_client = None
         self._data_client = None
+        self._crypto_data_client = None
         self._stock_stream = None
+        self._crypto_stream = None
         self._trading_stream = None
         self._news_stream = None
         logger.info("Disconnected from Alpaca")
@@ -519,7 +628,8 @@ class AlpacaClient(BaseExchangeClient):
     async def get_ticker_price(self, symbol: str) -> Decimal:
         """Return latest trade price — from stream cache or REST fallback.
 
-        Priority: streaming cache → get_stock_latest_trade (lighter than snapshot).
+        Crypto symbols route to ``CryptoHistoricalDataClient``.
+        Priority: streaming cache → latest_trade REST call.
         """
         # Try streaming cache first (sub-ms)
         cached = self.price_cache.get(symbol, max_age=30.0)
@@ -527,67 +637,102 @@ class AlpacaClient(BaseExchangeClient):
             logger.debug("get_ticker_price({}) = {} [from stream cache]", symbol, cached)
             return cached
 
-        # REST fallback: use lighter latest_trade instead of full snapshot
-        from alpaca.data.requests import StockLatestTradeRequest
-
         await self._rate_limiter.acquire()
         logger.debug("get_ticker_price({}) [REST fallback]", symbol)
-        try:
-            request = StockLatestTradeRequest(symbol_or_symbols=symbol)
-            trades = self._data_client.get_stock_latest_trade(request)
-            if isinstance(trades, dict):
-                trade = trades.get(symbol)
-            else:
-                trade = trades
-            if trade is None:
-                raise AlpacaClientError(f"No latest trade for {symbol}")
-            price = Decimal(str(trade.price))
-            # Update cache so next call uses cache
-            self.price_cache.update(symbol, price)
-            return price
-        except AlpacaClientError:
-            raise
-        except Exception as exc:
-            raise AlpacaClientError(
-                f"Failed to get ticker price for {symbol}: {exc}", original=exc
-            ) from exc
+
+        if self._is_crypto(symbol):
+            # ── Crypto REST fallback ──────────────────────────────────
+            try:
+                from alpaca.data.requests import CryptoLatestTradeRequest
+
+                if self._crypto_data_client is None:
+                    raise AlpacaClientError("CryptoHistoricalDataClient not initialized")
+                request = CryptoLatestTradeRequest(symbol_or_symbols=symbol)
+                trades = self._crypto_data_client.get_crypto_latest_trade(request)
+                if isinstance(trades, dict):
+                    trade = trades.get(symbol)
+                else:
+                    trade = trades
+                if trade is None:
+                    raise AlpacaClientError(f"No latest crypto trade for {symbol}")
+                price = Decimal(str(trade.price))
+                self.price_cache.update(symbol, price)
+                return price
+            except AlpacaClientError:
+                raise
+            except Exception as exc:
+                raise AlpacaClientError(
+                    f"Failed to get crypto ticker price for {symbol}: {exc}", original=exc
+                ) from exc
+        else:
+            # ── Stock REST fallback ───────────────────────────────────
+            from alpaca.data.requests import StockLatestTradeRequest
+
+            try:
+                request = StockLatestTradeRequest(symbol_or_symbols=symbol)
+                trades = self._data_client.get_stock_latest_trade(request)
+                if isinstance(trades, dict):
+                    trade = trades.get(symbol)
+                else:
+                    trade = trades
+                if trade is None:
+                    raise AlpacaClientError(f"No latest trade for {symbol}")
+                price = Decimal(str(trade.price))
+                self.price_cache.update(symbol, price)
+                return price
+            except AlpacaClientError:
+                raise
+            except Exception as exc:
+                raise AlpacaClientError(
+                    f"Failed to get ticker price for {symbol}: {exc}", original=exc
+                ) from exc
 
     async def get_order_book(self, symbol: str, limit: int = 10) -> dict:
-        """Return latest NBBO quote — lighter than full snapshot."""
-        from alpaca.data.requests import StockLatestQuoteRequest
-
+        """Return latest quote — NBBO for stocks, latest quote for crypto."""
         await self._rate_limiter.acquire()
         logger.debug("get_order_book({}, limit={})", symbol, limit)
-        try:
-            request = StockLatestQuoteRequest(symbol_or_symbols=symbol)
-            quotes = self._data_client.get_stock_latest_quote(request)
-            quote = quotes.get(symbol) if isinstance(quotes, dict) else quotes
-            if quote is None:
-                return {"bids": [], "asks": []}
-            return {
-                "bids": [
-                    {
-                        "price": Decimal(str(quote.bid_price)),
-                        "quantity": Decimal(str(quote.bid_size)),
-                    }
-                ],
-                "asks": [
-                    {
-                        "price": Decimal(str(quote.ask_price)),
-                        "quantity": Decimal(str(quote.ask_size)),
-                    }
-                ],
-            }
-        except Exception as exc:
-            raise AlpacaClientError(
-                f"Failed to get order book for {symbol}: {exc}", original=exc
-            ) from exc
+
+        if self._is_crypto(symbol):
+            try:
+                from alpaca.data.requests import CryptoLatestQuoteRequest
+
+                if self._crypto_data_client is None:
+                    return {"bids": [], "asks": []}
+                request = CryptoLatestQuoteRequest(symbol_or_symbols=symbol)
+                quotes = self._crypto_data_client.get_crypto_latest_quote(request)
+                quote = quotes.get(symbol) if isinstance(quotes, dict) else quotes
+                if quote is None:
+                    return {"bids": [], "asks": []}
+                return {
+                    "bids": [{"price": Decimal(str(quote.bid_price)), "quantity": Decimal(str(quote.bid_size))}],
+                    "asks": [{"price": Decimal(str(quote.ask_price)), "quantity": Decimal(str(quote.ask_size))}],
+                }
+            except Exception as exc:
+                raise AlpacaClientError(
+                    f"Failed to get crypto order book for {symbol}: {exc}", original=exc
+                ) from exc
+        else:
+            from alpaca.data.requests import StockLatestQuoteRequest
+
+            try:
+                request = StockLatestQuoteRequest(symbol_or_symbols=symbol)
+                quotes = self._data_client.get_stock_latest_quote(request)
+                quote = quotes.get(symbol) if isinstance(quotes, dict) else quotes
+                if quote is None:
+                    return {"bids": [], "asks": []}
+                return {
+                    "bids": [{"price": Decimal(str(quote.bid_price)), "quantity": Decimal(str(quote.bid_size))}],
+                    "asks": [{"price": Decimal(str(quote.ask_price)), "quantity": Decimal(str(quote.ask_size))}],
+                }
+            except Exception as exc:
+                raise AlpacaClientError(
+                    f"Failed to get order book for {symbol}: {exc}", original=exc
+                ) from exc
 
     async def get_klines(
         self, symbol: str, interval: str, limit: int = 100
     ) -> list:
-        """Fetch historical stock bars."""
-        from alpaca.data.requests import StockBarsRequest
+        """Fetch historical bars — routes to stock or crypto data client."""
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
         await self._rate_limiter.acquire()
@@ -613,6 +758,17 @@ class AlpacaClient(BaseExchangeClient):
         start = datetime.now(timezone.utc) - timedelta(
             minutes=minutes_per_bar * limit * 1.5
         )
+
+        if self._is_crypto(symbol):
+            return await self._get_crypto_klines(symbol, timeframe, start, limit)
+        else:
+            return await self._get_stock_klines(symbol, timeframe, start, limit)
+
+    async def _get_stock_klines(
+        self, symbol: str, timeframe: Any, start: datetime, limit: int
+    ) -> list:
+        """Fetch historical stock bars."""
+        from alpaca.data.requests import StockBarsRequest
 
         try:
             request = StockBarsRequest(
@@ -648,20 +804,64 @@ class AlpacaClient(BaseExchangeClient):
                 f"Failed to get klines for {symbol}: {exc}", original=exc
             ) from exc
 
+    async def _get_crypto_klines(
+        self, symbol: str, timeframe: Any, start: datetime, limit: int
+    ) -> list:
+        """Fetch historical crypto bars via CryptoHistoricalDataClient."""
+        from alpaca.data.requests import CryptoBarsRequest
+
+        if self._crypto_data_client is None:
+            raise AlpacaClientError("CryptoHistoricalDataClient not initialized")
+
+        try:
+            request = CryptoBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=timeframe,
+                start=start,
+                limit=limit,
+            )
+            bars_response = self._crypto_data_client.get_crypto_bars(request)
+
+            bars_list = (
+                bars_response[symbol]
+                if isinstance(bars_response, dict)
+                else bars_response.data.get(symbol, [])
+            )
+
+            result: list[dict[str, Any]] = []
+            for bar in bars_list[-limit:]:
+                result.append(
+                    {
+                        "timestamp": int(bar.timestamp.timestamp() * 1000),
+                        "open": Decimal(str(bar.open)),
+                        "high": Decimal(str(bar.high)),
+                        "low": Decimal(str(bar.low)),
+                        "close": Decimal(str(bar.close)),
+                        "volume": Decimal(str(bar.volume)),
+                        "vwap": Decimal(str(bar.vwap)) if hasattr(bar, "vwap") and bar.vwap else None,
+                    }
+                )
+            return result
+        except Exception as exc:
+            raise AlpacaClientError(
+                f"Failed to get crypto klines for {symbol}: {exc}", original=exc
+            ) from exc
+
     # ── Orders ───────────────────────────────────────────────────────────────
 
     async def place_limit_order(
         self, symbol: str, side: str, price: Decimal, quantity: Decimal
     ) -> dict:
-        """Place a limit order (DAY time-in-force for day trading)."""
+        """Place a limit order (DAY for stocks, GTC for crypto)."""
         from alpaca.trading.requests import LimitOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
 
         client = self._ensure_connected()
         await self._rate_limiter.acquire()
+        tif = TimeInForce.GTC if self._is_crypto(symbol) else TimeInForce.DAY
         logger.info(
-            "place_limit_order | symbol={} side={} price={} qty={}",
-            symbol, side, price, quantity,
+            "place_limit_order | symbol={} side={} price={} qty={} tif={}",
+            symbol, side, price, quantity, tif,
         )
         try:
             order_side = OrderSide.BUY if side.upper() == "BUY" else OrderSide.SELL
@@ -670,7 +870,7 @@ class AlpacaClient(BaseExchangeClient):
                 qty=float(quantity),
                 side=order_side,
                 type="limit",
-                time_in_force=TimeInForce.DAY,
+                time_in_force=tif,
                 limit_price=float(price),
             )
             order = client.submit_order(request)
@@ -690,15 +890,16 @@ class AlpacaClient(BaseExchangeClient):
     async def place_market_order(
         self, symbol: str, side: str, quantity: Decimal
     ) -> dict:
-        """Place a market order."""
+        """Place a market order (GTC for crypto, DAY for stocks)."""
         from alpaca.trading.requests import MarketOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
 
         client = self._ensure_connected()
         await self._rate_limiter.acquire()
+        tif = TimeInForce.GTC if self._is_crypto(symbol) else TimeInForce.DAY
         logger.info(
-            "place_market_order | symbol={} side={} qty={}",
-            symbol, side, quantity,
+            "place_market_order | symbol={} side={} qty={} tif={}",
+            symbol, side, quantity, tif,
         )
         try:
             order_side = OrderSide.BUY if side.upper() == "BUY" else OrderSide.SELL
@@ -707,7 +908,7 @@ class AlpacaClient(BaseExchangeClient):
                 qty=float(quantity),
                 side=order_side,
                 type="market",
-                time_in_force=TimeInForce.DAY,
+                time_in_force=tif,
             )
             order = client.submit_order(request)
             response = {
@@ -832,51 +1033,81 @@ class AlpacaClient(BaseExchangeClient):
     # ── Exchange Info / Filters ──────────────────────────────────────────────
 
     async def get_exchange_info(self, symbol: str) -> dict:
-        """Return asset info from Alpaca."""
+        """Return asset info from Alpaca (stocks and crypto)."""
         client = self._ensure_connected()
         await self._rate_limiter.acquire()
         logger.debug("get_exchange_info({})", symbol)
         try:
             asset = client.get_asset(symbol)
-            return {
+            info = {
                 "symbol": str(asset.symbol),
                 "name": str(asset.name),
                 "exchange": str(asset.exchange),
                 "asset_class": str(asset.asset_class),
                 "tradable": asset.tradable,
                 "fractionable": asset.fractionable,
-                "shortable": asset.shortable,
-                "easy_to_borrow": asset.easy_to_borrow,
+                "shortable": getattr(asset, "shortable", False),
+                "easy_to_borrow": getattr(asset, "easy_to_borrow", False),
             }
+            # Crypto assets have min_order_size and min_trade_increment
+            if hasattr(asset, "min_order_size") and asset.min_order_size:
+                info["min_order_size"] = str(asset.min_order_size)
+            if hasattr(asset, "min_trade_increment") and asset.min_trade_increment:
+                info["min_trade_increment"] = str(asset.min_trade_increment)
+            if hasattr(asset, "price_increment") and asset.price_increment:
+                info["price_increment"] = str(asset.price_increment)
+            return info
         except Exception as exc:
             raise AlpacaClientError(
                 f"Failed to get exchange info for {symbol}: {exc}", original=exc
             ) from exc
 
     async def get_symbol_filters(self, symbol: str) -> dict:
-        """Return symbol filters for stocks."""
+        """Return symbol filters for stocks or crypto."""
         if symbol in self._symbol_filters:
             return self._symbol_filters[symbol]
 
-        try:
-            info = await self.get_exchange_info(symbol)
-            fractionable = info.get("fractionable", False)
-            filters = {
-                "tick_size": Decimal("0.01"),
-                "step_size": Decimal("0.001") if fractionable else Decimal("1"),
-                "min_notional": Decimal("1"),
-                "min_qty": Decimal("0.001") if fractionable else Decimal("1"),
-            }
-        except Exception:
-            logger.warning(
-                "Could not fetch filters for {} — using stock defaults", symbol
-            )
-            filters = {
-                "tick_size": Decimal("0.01"),
-                "step_size": Decimal("1"),
-                "min_notional": Decimal("1"),
-                "min_qty": Decimal("1"),
-            }
+        if self._is_crypto(symbol):
+            # Crypto: always fractionable, min order sizes from Alpaca
+            try:
+                info = await self.get_exchange_info(symbol)
+                min_order = Decimal(str(info.get("min_order_size", "0.0001")))
+                min_increment = Decimal(str(info.get("min_trade_increment", "0.0001")))
+                price_increment = Decimal(str(info.get("price_increment", "0.01")))
+                filters = {
+                    "tick_size": price_increment,
+                    "step_size": min_increment,
+                    "min_notional": Decimal("1"),
+                    "min_qty": min_order,
+                }
+            except Exception:
+                logger.warning("Could not fetch crypto filters for {} — using defaults", symbol)
+                filters = {
+                    "tick_size": Decimal("0.01"),
+                    "step_size": Decimal("0.0001"),
+                    "min_notional": Decimal("1"),
+                    "min_qty": Decimal("0.0001"),
+                }
+        else:
+            try:
+                info = await self.get_exchange_info(symbol)
+                fractionable = info.get("fractionable", False)
+                filters = {
+                    "tick_size": Decimal("0.01"),
+                    "step_size": Decimal("0.001") if fractionable else Decimal("1"),
+                    "min_notional": Decimal("1"),
+                    "min_qty": Decimal("0.001") if fractionable else Decimal("1"),
+                }
+            except Exception:
+                logger.warning(
+                    "Could not fetch filters for {} — using stock defaults", symbol
+                )
+                filters = {
+                    "tick_size": Decimal("0.01"),
+                    "step_size": Decimal("1"),
+                    "min_notional": Decimal("1"),
+                    "min_qty": Decimal("1"),
+                }
 
         self._symbol_filters[symbol] = filters
         logger.debug("Symbol filters for {}: {}", symbol, filters)
@@ -1181,11 +1412,10 @@ class AlpacaClient(BaseExchangeClient):
     # ── Stream status helpers ─────────────────────────────────────────────────
 
     def is_streaming(self) -> bool:
-        """Return True if the market data websocket is connected."""
-        return (
-            self._stream_thread is not None
-            and self._stream_thread.is_alive()
-        )
+        """Return True if any market data websocket is connected."""
+        stock_ok = self._stream_thread is not None and self._stream_thread.is_alive()
+        crypto_ok = self._crypto_stream_thread is not None and self._crypto_stream_thread.is_alive()
+        return stock_ok or crypto_ok
 
     def is_trade_streaming(self) -> bool:
         """Return True if the trading event websocket is connected."""

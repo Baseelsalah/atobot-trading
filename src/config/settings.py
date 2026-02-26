@@ -268,6 +268,26 @@ class Settings(BaseSettings):
     SWING_MAX_GAP_PCT: float = 5.0            # Max overnight gap % before exit
     SWING_SYMBOLS: str = "AAPL,MSFT,NVDA,TSLA,AMD,META,GOOGL,AMZN"  # Swing universe
 
+    # ── Crypto Swing Strategy (24/7 Alpaca Crypto) ────────────────────────
+    # Backtest-optimized (Config D: Conservative) — 6mo +22.9%, PF 1.53
+    CRYPTO_ENABLED: bool = True              # Master switch for crypto trading
+    CRYPTO_SYMBOLS: str = "BTC/USD,ETH/USD"  # Comma-separated crypto pairs
+    CRYPTO_RSI_OVERSOLD: float = 35.0        # RSI entry threshold (crypto is volatile)
+    CRYPTO_RSI_OVERBOUGHT: float = 75.0      # RSI exit threshold
+    CRYPTO_VOLUME_SURGE: float = 1.5         # Min rel volume for entry
+    CRYPTO_MIN_CONFLUENCE: int = 3           # Min signals needed (3 = more selective)
+    CRYPTO_TAKE_PROFIT_PCT: float = 10.0     # Take-profit % (wide for crypto swings)
+    CRYPTO_STOP_LOSS_PCT: float = 5.0        # Stop-loss % (crypto needs breathing room)
+    CRYPTO_TRAILING_ACTIVATION_PCT: float = 5.0  # Activate trailing at +5%
+    CRYPTO_TRAILING_OFFSET_PCT: float = 2.5  # Trail distance from high
+    CRYPTO_MAX_HOLD_DAYS: int = 14           # Max days before time stop
+    CRYPTO_MAX_POSITIONS: int = 2            # Max concurrent crypto positions
+    CRYPTO_RISK_PER_TRADE_PCT: float = 4.0   # Risk 4% per trade (aggressive)
+    CRYPTO_ORDER_SIZE_USD: float = 200.0     # Fallback order size for $500 acct
+    CRYPTO_EQUITY_CAP: float = 0.0           # Cap equity for sizing (0 = use real)
+    CRYPTO_BTC_TREND_GATE: bool = True       # Only enter alts if BTC trend is up
+    CRYPTO_FEE_BPS: float = 25.0             # Alpaca taker fee (basis points)
+
     # ── MACD Entry Confirmation ───────────────────────────────────────────────
     MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
     MACD_FAST: int = 12
@@ -347,7 +367,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Ensure strategy name is valid."""
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
         if v.lower() not in allowed:
             raise ValueError(f"DEFAULT_STRATEGY must be one of {allowed}, got '{v}'")
         return v.lower()
@@ -392,7 +412,7 @@ class Settings(BaseSettings):
         """If STRATEGIES is empty, fall back to [DEFAULT_STRATEGY]."""
         if not self.STRATEGIES:
             self.STRATEGIES = [self.DEFAULT_STRATEGY]
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing"}
+        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
         for s in self.STRATEGIES:
             if s not in allowed:
                 raise ValueError(f"Unknown strategy in STRATEGIES: '{s}'. Allowed: {allowed}")

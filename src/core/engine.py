@@ -26,6 +26,11 @@ from src.utils.helpers import calculate_pnl, decimal_from_str, format_usd
 class TradingEngine:
     """Main trading loop that orchestrates strategy execution."""
 
+    @staticmethod
+    def _is_crypto_symbol(symbol: str) -> bool:
+        """Return True if symbol is a crypto pair (e.g. BTC/USD)."""
+        return "/" in symbol
+
     def __init__(
         self,
         exchange: BaseExchangeClient,
@@ -258,6 +263,24 @@ class TradingEngine:
                             "Market closed — waiting for market hours (tick #{}){}",
                             self._tick_count, next_open_str,
                         )
+
+                    # ── Crypto symbols trade 24/7 even when stock market closed ──
+                    crypto_symbols = [s for s in self.settings.SYMBOLS if self._is_crypto_symbol(s)]
+                    if crypto_symbols:
+                        for symbol in crypto_symbols:
+                            for strat in self.strategies:
+                                # Only crypto strategies should process crypto symbols
+                                if not getattr(strat, 'exempt_eod_flatten', False):
+                                    continue
+                                if strat.name != "crypto_swing":
+                                    continue
+                                try:
+                                    await self._process_symbol(
+                                        symbol, balances, strat,
+                                        block_entries=False,
+                                    )
+                                except Exception as exc:
+                                    logger.error("Error processing crypto {} [{}]: {}", symbol, strat.name, exc)
                     return
             except Exception as exc:
                 logger.warning("Could not check market hours: {}", exc)
@@ -323,11 +346,20 @@ class TradingEngine:
                 logger.info("Circuit breaker ACTIVE — blocking new entries")
 
         for symbol in self.settings.SYMBOLS:
+            is_crypto = self._is_crypto_symbol(symbol)
             for strat in self.strategies:
+                # Only crypto_swing processes crypto symbols; stock strategies skip them
+                if is_crypto and strat.name != "crypto_swing":
+                    continue
+                # crypto_swing should NOT process stock symbols
+                if not is_crypto and strat.name == "crypto_swing":
+                    continue
+                # Crypto symbols ignore stock EOD block and circuit breaker
+                effective_block = False if is_crypto else (eod_block_entries or circuit_breaker_active)
                 try:
                     await self._process_symbol(
                         symbol, balances, strat,
-                        block_entries=eod_block_entries or circuit_breaker_active,
+                        block_entries=effective_block,
                     )
                 except Exception as exc:
                     logger.error("Error processing {} [{}]: {}", symbol, strat.name, exc)
@@ -351,7 +383,9 @@ class TradingEngine:
             return
 
         # ── Halt detection (from streaming trading statuses) ──────────────
-        if hasattr(self.exchange, "is_symbol_halted") and self.exchange.is_symbol_halted(symbol):
+        # Crypto symbols don't have halt statuses
+        is_crypto = self._is_crypto_symbol(symbol)
+        if not is_crypto and hasattr(self.exchange, "is_symbol_halted") and self.exchange.is_symbol_halted(symbol):
             logger.debug("Symbol {} is halted — skipping [{}]", symbol, strat.name)
             return
 
@@ -414,8 +448,10 @@ class TradingEngine:
                 continue
 
             # Gap filter: skip entries in the first N minutes after a big gap
+            # (not applicable to 24/7 crypto markets)
             if (
-                self._gap_filter_until
+                not self._is_crypto_symbol(order.symbol)
+                and self._gap_filter_until
                 and datetime.now(timezone.utc) < self._gap_filter_until
                 and str(order.side).upper() in ("BUY", "SHORT")
             ):
