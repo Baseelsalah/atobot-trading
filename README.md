@@ -1,8 +1,20 @@
 # AtoBot Trading
 
-**Autonomous Stock Day-Trading Bot** — async Python bot using **Alpaca** paper/live accounts to trade equities during market hours with multi-strategy support, risk management, Telegram alerts, and backtesting.
+**Autonomous algorithmic day-trading bot** built in async Python -- connects to **Alpaca Markets** (paper or live) to trade US equities during market hours with seven pluggable strategies, a self-healing Guardian agent, OpenAI-powered trade analysis, and a real-time Streamlit dashboard.
 
-> **Backtest winner:** VWAP Scalp + ORB with midday filter → **$3,194/mo** estimated on $100k account (3-month average).
+> **1-Year Backtest Result:** VWAP Scalp + ORB on 8 symbols at $35K order size -> **+$83,534 net P&L on a $100K account** using 2:1 margin (exceeds $75K/yr target by 11%).
+
+---
+
+## What It Does
+
+AtoBot monitors a configurable watchlist of equities every 10 seconds during market hours. Each tick it:
+
+1. **Reads the market regime** -- classifies trend, volatility, breadth, and sector rotation via SPY/QQQ/VIX/IWM.
+2. **Runs signal generation** -- one or more active strategies vote on entry/exit signals for each symbol.
+3. **Checks risk gates** -- position limits, daily loss cap, max drawdown, PDT, and stop-loss enforced before every order.
+4. **Executes orders** -- async Alpaca REST client; fills persisted to SQLite and streamed to Telegram.
+5. **Self-monitors via Guardian** -- separate process checks health every 60s, heals faults, auto-tunes parameters daily.
 
 ---
 
@@ -10,37 +22,54 @@
 
 ```
 src/
-├── config/          Settings (pydantic-settings, .env)
-├── models/          Order, Position, Trade (Pydantic, Decimal)
-├── utils/           Logger, retry decorator, helpers
-├── exchange/        Abstract base + Alpaca async client
-├── risk/            RiskManager (position limits, drawdown, PDT, stop-loss)
-├── data/            MarketDataProvider + technical indicators (RSI, EMA, VWAP)
-├── strategies/      BaseStrategy → MomentumStrategy, ORBStrategy, VWAPScalpStrategy
-├── notifications/   BaseNotifier → TelegramNotifier
-├── persistence/     SQLAlchemy 2.0 async (SQLite)
-├── core/            TradingEngine loop + AtoBot orchestrator
-├── dashboard/       Streamlit real-time dashboard
-└── main.py          Entry point
-backtest.py          Quick single-strategy backtester
-backtest_v2.py       Full A/B comparison engine (baseline vs improved filters)
+|-- config/          Pydantic-Settings config loaded from .env
+|-- models/          Order, Position, Trade -- typed Pydantic + Decimal
+|-- utils/           Loguru logger, retry decorator, helpers
+|-- exchange/        Abstract base + Alpaca async client
+|-- data/            MarketDataProvider + indicators (RSI, EMA, VWAP, ATR, BBands)
+|-- strategies/      7 strategies (see below) + strategy selector
+|-- scanner/         MarketScanner, RegimeDetector, NewsIntel
+|-- intelligence/    AITradeAdvisor (GPT-4o-mini), MLModel, MLFeatureEngine
+|-- risk/            RiskManager + Kelly Criterion position sizer
+|-- analytics/       TradeJournal, ProfitGoalTracker
+|-- notifications/   TelegramNotifier
+|-- persistence/     SQLAlchemy 2.0 async (SQLite)
+|-- guardian/        HealthMonitor, SelfHealer, PerformanceAnalyzer, AutoTuner
+|-- dashboard/       Streamlit real-time dashboard
+`-- main.py          Entry point (asyncio + graceful SIGINT/SIGTERM)
+backtest*.py         Backtesting suite (single-strategy, A/B, stress, crypto)
 tests/               152 pytest-asyncio tests
 ```
 
 ---
 
+## Key Features
+
+| Feature | Detail |
+|---------|--------|
+| **7 trading strategies** | VWAP Scalp, ORB, Momentum, EMA Pullback, Swing, Pairs/StatArb, Crypto |
+| **Multi-strategy** | Run several strategies simultaneously; signals weighted by regime |
+| **Market regime detection** | Trend / volatility / breadth / sector-rotation classifier before every trade |
+| **AI trade advisor** | GPT-4o-mini pre-trade sentiment check + daily market briefing (optional) |
+| **Guardian agent** | Separate watchdog: health checks, self-healing, auto-parameter tuning |
+| **Kelly Criterion sizing** | Mathematically optimal position sizing via f* = (bp - q) / b |
+| **PDT protection** | Hard block on trades that would trigger the Pattern Day Trader rule |
+| **End-of-day flatten** | All positions closed before market close; no overnight exposure |
+| **Real-time dashboard** | Streamlit UI: live equity curve, open positions, trade log |
+| **Telegram alerts** | Fill notifications, errors, daily P&L summaries, emergency shutdown |
+| **Full test suite** | 152 pytest-asyncio tests: strategies, risk, exchange, persistence |
+| **Docker** | docker-compose up -d starts bot + dashboard |
+
+---
+
 ## Quick Start
 
-### 1. Clone & install
+### 1. Clone and install
 
 ```bash
 git clone <repo-url> && cd atobot-trading
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux / macOS
-source .venv/bin/activate
-
+# Windows: .venv\Scriptsctivate  |  macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -48,8 +77,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env — add your Alpaca API keys
-# ALPACA_PAPER=true and DRY_RUN=true are on by default (no real money)
+# Add Alpaca API keys -- ALPACA_PAPER=true and DRY_RUN=true by default (no real money)
 ```
 
 ### 3. Run the bot
@@ -64,7 +92,13 @@ python -m src.main
 streamlit run src/dashboard/app.py
 ```
 
-### 5. Run tests
+### 5. Run the Guardian agent (recommended in production)
+
+```bash
+python -m src.guardian
+```
+
+### 6. Run tests
 
 ```bash
 pytest tests/ -v
@@ -74,10 +108,10 @@ pytest tests/ -v
 
 ## Strategies
 
-The bot supports running **multiple strategies simultaneously** on the same symbols. Set `STRATEGIES=["vwap_scalp","orb"]` in `.env`.
+All strategies inherit from `BaseStrategy` and are selected via `STRATEGIES` in `.env`.
 
-### VWAP Scalp (Best performer)
-Enters long when price bounces off VWAP from below. Exits at a fixed take-profit or stop-loss. High-frequency with many small wins.
+### VWAP Scalp *(Best performer)*
+Enters long when price bounces off VWAP from below. High-frequency; many small wins compound quickly.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -87,7 +121,7 @@ Enters long when price bounces off VWAP from below. Exits at a fixed take-profit
 | `VWAP_ORDER_SIZE_USD` | 500 | Dollar amount per trade |
 
 ### ORB (Opening Range Breakout)
-Defines the high/low of the first 15 minutes, then enters on a confirmed breakout above the range. Works well paired with VWAP.
+Defines the high/low of the first 15 minutes, then enters on a confirmed breakout above the range. Works best paired with VWAP.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -95,30 +129,47 @@ Defines the high/low of the first 15 minutes, then enters on a confirmed breakou
 | `ORB_BREAKOUT_PERCENT` | 0.1 | % above range to confirm breakout |
 | `ORB_TAKE_PROFIT_PERCENT` | 1.5 | % profit target |
 | `ORB_STOP_LOSS_PERCENT` | 0.75 | % stop-loss |
-| `ORB_ORDER_SIZE_USD` | 500 | Dollar amount per trade |
 
 ### Momentum (RSI + Volume)
-Buys when RSI is oversold AND volume spikes above the moving average. Lower frequency, larger moves.
+Buys when RSI is oversold **and** volume spikes above the 20-period average. Lower frequency, larger per-trade moves.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `MOMENTUM_RSI_OVERSOLD` | 30 | RSI threshold for buy signal |
-| `MOMENTUM_RSI_OVERBOUGHT` | 70 | RSI threshold for sell signal |
-| `MOMENTUM_VOLUME_MULTIPLIER` | 1.5 | Min relative volume to entry |
-| `MOMENTUM_TAKE_PROFIT_PERCENT` | 2.0 | % profit target |
-| `MOMENTUM_STOP_LOSS_PERCENT` | 1.0 | % stop-loss |
+### EMA Pullback
+3-layer EMA stack (9/21/50) on 5-minute bars. Enters on pullback to 9 or 21 EMA while price stays above the 50 EMA. RSI in the 35-55 zone confirms oversold-in-uptrend.
+
+### Swing (Multi-Day)
+Holds positions 1-5 days to capture 2-5% moves. Requires 2+ confluence signals (RSI bounce, EMA support, volume surge, candle pattern). Avoids PDT by holding overnight.
+
+### Pairs / Statistical Arbitrage
+Trades mean-reversion of the log-price spread between correlated assets (e.g. NVDA:AMD, GOOGL:META). Enters when rolling z-score exceeds threshold; hedge ratio via OLS regression.
+
+### Crypto
+VWAP + RSI adapted for 24/7 crypto markets via the Binance async client.
+
+---
+
+## Market Regime Detection
+
+Before any strategy runs, `RegimeDetector` classifies five orthogonal dimensions from SPY/QQQ/VIX/IWM:
+
+| Dimension | Classes |
+|-----------|---------|
+| **Trend** | strong_bull, bull, neutral, bear, strong_bear, choppy |
+| **Volatility** | low (VIX <15), normal, elevated, extreme (VIX >30) |
+| **Breadth** | Advance/decline ratio; narrow vs broad participation |
+| **Momentum** | Risk-on (QQQ > SPY) vs risk-off (TLT, GLD, XLU flows) |
+| **Time-of-day** | Open drive, mid-day chop, power hour |
+
+The engine reduces position sizes in elevated-volatility regimes and skips new entries in choppy or extreme regimes.
 
 ---
 
 ## Entry Filters
 
-Filters are applied before any strategy generates an entry signal. Tuned via backtesting.
-
-| Filter | Default | Backtest Result | Description |
+| Filter | Default | Backtest Impact | Description |
 |--------|---------|-----------------|-------------|
-| **Midday Filter** | `AVOID_MIDDAY=true` | **+6.6%** improvement | Skips entries 12–2 PM ET (low volume chop) |
-| **EMA Trend Filter** | `TREND_FILTER_ENABLED=false` | **-71% entries**, net negative | Only enter when price > 20-period EMA |
-| **Trailing Stop** | `TRAILING_STOP_ENABLED=false` | Inactive at safe params | Trail stop behind highest price after activation |
+| **Midday Filter** | AVOID_MIDDAY=true | **+6.6%** improvement | Skips entries 12-2 PM ET (low-volume chop) |
+| **EMA Trend Filter** | TREND_FILTER_ENABLED=false | -71% entry count, net negative | Only enter when price > 20-period EMA |
+| **Trailing Stop** | TRAILING_STOP_ENABLED=false | Inactive at safe params | Trail stop behind highest price |
 
 ---
 
@@ -126,45 +177,78 @@ Filters are applied before any strategy generates an entry signal. Tuned via bac
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `MAX_POSITION_SIZE_USD` | 2000 | Max $ in one stock |
+| `MAX_POSITION_SIZE_USD` | 2000 | Max dollars in one symbol |
 | `MAX_OPEN_ORDERS` | 10 | Max simultaneous open orders |
 | `DAILY_LOSS_LIMIT_USD` | 200 | Max daily loss before halting |
 | `MAX_DRAWDOWN_PERCENT` | 5 | Max portfolio drawdown % |
 | `STOP_LOSS_PERCENT` | 2 | Per-position stop-loss % |
 | `MAX_DAILY_TRADES` | 20 | Max trades per day |
-| `PDT_PROTECTION` | true | Block trades that trigger PDT rule |
+| `PDT_PROTECTION` | true | Block trades that trigger the PDT rule |
 | `FLATTEN_EOD` | true | Close all positions before market close |
 
-The risk manager is checked **before every order** and again at each tick for stop-loss and drawdown. Three consecutive engine errors trigger an automatic emergency shutdown.
+The `RiskManager` is evaluated **before every order** and on each tick for stop-loss and drawdown. Three consecutive engine errors trigger an automatic emergency shutdown.
+
+Position sizes use the **Kelly Criterion** (f* = (bp - q) / b) with a fractional-Kelly cap to limit variance.
+
+---
+
+## Guardian Agent
+
+A separate long-running process (`python -m src.guardian`) acts as an autonomous watchdog:
+
+| Module | Interval | Responsibility |
+|--------|----------|----------------|
+| `HealthMonitor` | 60 s | Checks process liveness, API connectivity, disk space, error rates |
+| `SelfHealer` | on fault | Restarts dead workers, clears stale locks, resets error counters |
+| `PerformanceAnalyzer` | 1 h | Computes Sharpe, MDD, win rate, profit factor from the trade journal |
+| `AutoTuner` | 24 h | Adjusts stop sizes and take-profit targets within safe bounds |
+| `WalkForwardValidator` | on tune | Out-of-sample validation before any parameter change is applied |
+
+---
+
+## AI Trade Advisor *(optional)*
+
+Set `OPENAI_API_KEY` in `.env` to enable GPT-4o-mini integration:
+
+- **Pre-trade sentiment check** -- evaluates price action, indicators, and market context before every entry.
+- **Daily market briefing** -- summarises conditions before the open.
+- **Trade review** -- analyses completed trades for patterns and improvement opportunities.
+- Responses cached 5 minutes; hard cap of 200 API calls/day to control costs.
+- Gracefully degrades to neutral/allow when the API key is absent.
 
 ---
 
 ## Backtesting
 
-### Quick backtest (single strategy)
-```bash
-python backtest.py
-```
+### 1-Year Results (best configuration)
 
-### A/B comparison (baseline vs improved filters)
-```bash
-python backtest_v2.py
-```
+| Configuration | Annual P&L | vs $75K Target |
+|---------------|-----------|----------------|
+| 5 symbols, $17K orders | +$5,854 | 8% |
+| 5 symbols, $35K orders | +$42,408 | 57% |
+| 8 symbols, $30K orders | +$46,321 | 62% |
+| **8 symbols, $35K orders** | **+$83,534** | **111% (target exceeded)** |
 
-Compares all 3 strategies (baseline vs improved), isolated filter tests, and multi-strategy combos. Results are printed in a comparison table.
+Period: 2025-02-22 to 2026-02-22 | Starting capital: $100K | Margin: 2:1
+Symbols: AAPL MSFT TSLA NVDA AMD META AMZN GOOG | Slippage: 1.0 bp/round-trip
+
+### Run a backtest
+
+```bash
+python backtest.py              # quick single-strategy
+python backtest_v2.py           # A/B comparison, all strategies
+python backtest_1year.py        # 1-year scaling study
+python backtest_stress_hardened.py  # COVID crash + high-vol stress test
+```
 
 ---
 
 ## Docker
 
 ```bash
-# Build and run bot + dashboard
-docker-compose up -d
-
-# View logs
-docker-compose logs -f bot
-
-# Dashboard available at http://localhost:8501
+docker-compose up -d            # start bot + dashboard
+docker-compose logs -f bot      # follow logs
+# Dashboard: http://localhost:8501
 ```
 
 ---
@@ -182,43 +266,34 @@ Set `NOTIFICATIONS_ENABLED=true` plus `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID
 
 ## Configuration Reference
 
-All settings are loaded from environment variables (or `.env` file). See [.env.example](.env.example) for the full list with defaults.
+All settings load from environment variables or a `.env` file. See `.env.example` for the full list.
 
-| Category | Variable | Type | Default |
-|----------|----------|------|---------|
-| Exchange | `EXCHANGE` | str | `alpaca` |
-| Alpaca | `ALPACA_API_KEY` | str | — |
-| Alpaca | `ALPACA_API_SECRET` | str | — |
-| Alpaca | `ALPACA_PAPER` | bool | `true` |
-| Trading | `SYMBOLS` | JSON list | `["AAPL","MSFT","TSLA","NVDA","AMD"]` |
-| Trading | `DEFAULT_STRATEGY` | str | `vwap_scalp` |
-| Trading | `STRATEGIES` | JSON list | `["vwap_scalp","orb"]` |
-| Trading | `BASE_ORDER_SIZE_USD` | float | `500` |
-| Trading | `DRY_RUN` | bool | `true` |
-| Filters | `AVOID_MIDDAY` | bool | `true` |
-| Filters | `TREND_FILTER_ENABLED` | bool | `false` |
-| Filters | `TRAILING_STOP_ENABLED` | bool | `false` |
-| Timing | `POLL_INTERVAL_SECONDS` | int | `10` |
-| Database | `DATABASE_URL` | str | `sqlite+aiosqlite:///data/atobot.db` |
-| Logging | `LOG_LEVEL` | str | `INFO` |
+| Category | Variable | Default |
+|----------|----------|---------|
+| Exchange | `EXCHANGE` | alpaca |
+| Alpaca | `ALPACA_API_KEY` / `ALPACA_API_SECRET` | -- |
+| Alpaca | `ALPACA_PAPER` | true |
+| Trading | `SYMBOLS` | ["AAPL","TSLA",...] |
+| Trading | `STRATEGIES` | ["vwap_scalp","orb"] |
+| Trading | `BASE_ORDER_SIZE_USD` | 500 |
+| Trading | `DRY_RUN` | true |
+| Filters | `AVOID_MIDDAY` | true |
+| AI | `OPENAI_API_KEY` | -- (optional) |
+| Timing | `POLL_INTERVAL_SECONDS` | 10 |
+| Database | `DATABASE_URL` | sqlite+aiosqlite:///data/atobot.db |
 
 ---
 
 ## Development
 
 ```bash
-# Install with dev extras
-pip install -e ".[dev]"
-
-# Lint
-ruff check src/ tests/
-
-# Type check
-mypy src/
-
-# Test with coverage (152 tests)
-pytest tests/ -v --tb=short
+pip install -e .[dev]
+ruff check src/ tests/          # lint
+mypy src/                        # type check (strict)
+pytest tests/ -v --tb=short     # 152 tests
 ```
+
+**Tech stack:** Python 3.11 - asyncio - Pydantic v2 - SQLAlchemy 2.0 async - Alpaca-py - Streamlit - Loguru - pytest-asyncio - Docker
 
 ---
 
