@@ -81,11 +81,13 @@ class TestVWAPEntry:
     @pytest.mark.asyncio
     async def test_buy_below_vwap(self, strategy: VWAPScalpStrategy) -> None:
         """BUY when price is below VWAP by bounce percent."""
-        bars = _make_bars([
+        # Need 35+ bars to clear warmup; repeat pattern so VWAP ≈ 186
+        base = [
             ("184", "186", "183", "185"),
             ("185", "187", "184", "186"),
             ("186", "188", "185", "187"),
-        ])
+        ]
+        bars = _make_bars(base * 12)  # 36 bars, VWAP ≈ 186
         strategy.exchange.get_klines = AsyncMock(return_value=bars)
         await strategy.initialize("AAPL")
 
