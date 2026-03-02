@@ -1,13 +1,25 @@
-"""Update VPS .env with new Alpaca keys and restart bot."""
-import paramiko
+"""Update VPS .env with new Alpaca keys and restart bot.
+
+Reads all credentials from local .env — never hardcode secrets in this file.
+
+Required in .env:
+    ALPACA_API_KEY, ALPACA_API_SECRET  — new keys to push to VPS
+    VPS_HOST, VPS_USER, VPS_PASS       — server SSH credentials
+"""
+import os
 import time
 
-HOST = "165.232.55.24"
-USER = "root"
-PASS = "eddy587SFbs"
+import paramiko
+from dotenv import load_dotenv
 
-NEW_KEY = "PKSI4TAWFCMN2GZL7ELQNQFLMR"
-NEW_SECRET = "BH1oF94L5tUfodCjqsJnzwdh7LvFvECqPY7SDsMpVL5V"
+load_dotenv()
+
+HOST = os.environ["VPS_HOST"]
+USER = os.environ["VPS_USER"]
+PASS = os.environ["VPS_PASS"]
+
+NEW_KEY    = os.environ["ALPACA_API_KEY"]
+NEW_SECRET = os.environ["ALPACA_API_SECRET"]
 
 
 def run(client, cmd, timeout=60):
@@ -32,14 +44,12 @@ print("[1/4] Updating Alpaca API keys...")
 run(client, f"sed -i 's/ALPACA_API_KEY=.*/ALPACA_API_KEY={NEW_KEY}/' /opt/atobot/.env")
 run(client, f"sed -i 's/ALPACA_API_SECRET=.*/ALPACA_API_SECRET={NEW_SECRET}/' /opt/atobot/.env")
 
-# Verify
 print("\n  Verifying keys in .env:")
 run(client, "grep ALPACA_API /opt/atobot/.env")
 
 # 2. Restart bot
 print("\n[2/4] Restarting bot with new keys...")
-run(client, "cd /opt/atobot && docker compose restart bot", timeout=60)
-
+run(client, "cd /opt/atobot && docker compose restart bot", timeout=90)
 time.sleep(8)
 
 # 3. Check status
