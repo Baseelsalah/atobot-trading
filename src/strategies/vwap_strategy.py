@@ -164,12 +164,26 @@ class VWAPScalpStrategy(BaseStrategy):
 
             # MACD death cross exit REMOVED in v3 (backtest proved it hurt avg win)
 
-            # Take profit: price returned to VWAP (or PnL target)
+            # Take profit:
+            # v8 fix: VWAP-touch exit now requires the position to be in profit.
+            # Previously, `price >= vwap` fired when VWAP drifted below our entry
+            # (bearish market) producing only ~0.12% "wins" against 0.50% ATR SLs.
+            # Kelly was negative: f* = (0.54×0.12 − 0.46×0.50) / 0.06 = −2.75.
+            # Fix: VWAP touch is secondary; primary exit is the hard TP%.
+            # VWAP touch only triggers when unrealized PnL > 0 (never exit at loss).
             if pos.side == "LONG":
-                tp_triggered = current_price >= vwap or pos.unrealized_pnl_percent >= tp
+                tp_triggered = (
+                    pos.unrealized_pnl_percent >= tp            # Hard TP% — primary
+                    or (current_price >= vwap                   # VWAP return — secondary,
+                        and pos.unrealized_pnl_percent > Decimal("0"))  # only when profitable
+                )
             else:
                 # Short TP: price dropped back to VWAP (or below)
-                tp_triggered = current_price <= vwap or pos.unrealized_pnl_percent >= tp
+                tp_triggered = (
+                    pos.unrealized_pnl_percent >= tp
+                    or (current_price <= vwap
+                        and pos.unrealized_pnl_percent > Decimal("0"))
+                )
 
             if tp_triggered:
                 qty = round_quantity(pos.quantity, filters["step_size"])
@@ -225,7 +239,9 @@ class VWAPScalpStrategy(BaseStrategy):
             if not await self.passes_confluence_gate(symbol):
                 return orders
 
-            # ── ATR-based dynamic stop-loss (v7: never tighter than baseline) ──
+            # ── ATR-based dynamic stop-loss (v8: cap at 0.35% not 0.50%) ──────
+            # v8 fix: old 0.50% cap let ATR SL exceed typical 0.25% wins.
+            # Cap at 0.35% keeps SL < TP (0.4%) for positive R:R.
             dynamic_sl_pct = float(self.settings.VWAP_STOP_LOSS_PERCENT)
             if len(df) >= 15:
                 tr = pd.concat([
@@ -237,7 +253,7 @@ class VWAPScalpStrategy(BaseStrategy):
                 if not pd.isna(atr_14):
                     atr_pct = (atr_14 / float(current_price)) * 100
                     baseline_sl = float(self.settings.VWAP_STOP_LOSS_PERCENT)
-                    dynamic_sl_pct = max(baseline_sl, min(0.50, atr_pct * 1.5))
+                    dynamic_sl_pct = max(baseline_sl, min(0.35, atr_pct * 1.5))  # O(1)
             self._atr_stops[symbol] = Decimal(str(round(dynamic_sl_pct, 4)))
 
             # ── Dynamic position sizing (v5: Kelly + 2% risk + progressive) ──
@@ -273,7 +289,7 @@ class VWAPScalpStrategy(BaseStrategy):
                 if not await self.passes_confluence_gate(symbol):
                     pass  # Fall through to logging
                 else:
-                    # ATR-based dynamic stop for short
+                    # ATR-based dynamic stop for short (v8: cap at 0.35%)
                     dynamic_sl_pct = float(self.settings.VWAP_STOP_LOSS_PERCENT)
                     if len(df) >= 15:
                         tr = pd.concat([
@@ -285,7 +301,7 @@ class VWAPScalpStrategy(BaseStrategy):
                         if not pd.isna(atr_14):
                             atr_pct = (atr_14 / float(current_price)) * 100
                             baseline_sl = float(self.settings.VWAP_STOP_LOSS_PERCENT)
-                            dynamic_sl_pct = max(baseline_sl, min(0.50, atr_pct * 1.5))
+                            dynamic_sl_pct = max(baseline_sl, min(0.35, atr_pct * 1.5))
                     self._atr_stops[symbol] = Decimal(str(round(dynamic_sl_pct, 4)))
 
                     quantity = await self.compute_dynamic_quantity(

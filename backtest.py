@@ -602,6 +602,7 @@ class BacktestRunner:
                 pnl=pnl,
                 entry_time=self._entry_times.pop(sym, bar_ts),
                 exit_time=bar_ts,
+                exit_reason="TP" if pnl > 0 else "SL",  # O(1) proxy: +PnL→TP, −PnL→SL
             ))
         elif side_upper in ("BUY", "SHORT"):
             # Opening a position — deduct cash
