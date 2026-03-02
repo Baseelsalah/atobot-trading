@@ -206,7 +206,7 @@ class TestAnalysis:
         journal.record_trade(_entry("win", strategy="momentum", hour=9, setup_type="RSI_bounce", exit_reason="TP1"))
         journal.record_trade(_entry("win", strategy="momentum", hour=10, setup_type="RSI_bounce", exit_reason="TP2"))
         journal.record_trade(_entry("loss", strategy="vwap", hour=11, setup_type="VWAP_revert", exit_reason="SL"))
-        journal.record_trade(_entry("win", strategy="orb", hour=9, setup_type="ORB_break", exit_reason="trailing"))
+        journal.record_trade(_entry("win", strategy="ema_pullback", hour=9, setup_type="EMA_pull", exit_reason="trailing"))
         journal.record_trade(_entry("loss", strategy="momentum", hour=14, setup_type="RSI_bounce", exit_reason="SL", regime="volatile"))
 
     def test_time_of_day_analysis(self, journal):
@@ -220,7 +220,7 @@ class TestAnalysis:
         result = journal.strategy_comparison()
         assert "momentum" in result
         assert "vwap" in result
-        assert "orb" in result
+        assert "ema_pullback" in result
 
     def test_setup_analysis(self, journal):
         self._populate(journal)

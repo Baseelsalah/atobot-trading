@@ -9,7 +9,6 @@ Philosophy:
 
 Tunable parameters per strategy:
 - VWAP: bounce %, take-profit %, stop-loss %, order size
-- ORB: range minutes, breakout %, TP %, SL %, order size
 - Midday filter hours
 - Position sizing (order size USD)
 
@@ -43,11 +42,6 @@ BOUNDS = {
     "VWAP_TAKE_PROFIT_PERCENT": (0.20, 1.00),
     "VWAP_STOP_LOSS_PERCENT": (0.10, 0.60),
     "VWAP_ORDER_SIZE_USD": (200.0, 1000.0),
-    "ORB_RANGE_MINUTES": (10, 30),
-    "ORB_BREAKOUT_PERCENT": (0.05, 0.30),
-    "ORB_TAKE_PROFIT_PERCENT": (0.75, 3.00),
-    "ORB_STOP_LOSS_PERCENT": (0.30, 1.50),
-    "ORB_ORDER_SIZE_USD": (200.0, 1000.0),
     "MIDDAY_START_HOUR": (11, 13),
     "MIDDAY_END_HOUR": (13, 15),
 }
@@ -159,8 +153,6 @@ class AutoTuner:
 
         if name == "vwap_scalp":
             actions.extend(self._tune_vwap(metrics))
-        elif name == "orb":
-            actions.extend(self._tune_orb(metrics))
 
         return actions
 
@@ -222,60 +214,6 @@ class AutoTuner:
                 "VWAP_ORDER_SIZE_USD",
                 reason=f"VWAP profitable ${m.total_pnl:.2f} PF={m.profit_factor:.2f} → sizing up",
                 strategy="vwap_scalp",
-                snapshot=snapshot,
-            )
-            if action:
-                actions.append(action)
-
-        return actions
-
-    def _tune_orb(self, m: StrategyMetrics) -> list[TuneAction]:
-        """Tune ORB parameters."""
-        actions = []
-        snapshot = {
-            "trades": m.total_trades, "wr": m.win_rate,
-            "pf": m.profit_factor, "pnl": str(m.total_pnl),
-        }
-
-        # High win rate → widen TP
-        if m.win_rate > 0.50 and m.profit_factor > 1.2:
-            action = self._nudge_up(
-                "ORB_TAKE_PROFIT_PERCENT",
-                reason=f"ORB strong: WR={m.win_rate:.1%} PF={m.profit_factor:.2f} → widening TP",
-                strategy="orb",
-                snapshot=snapshot,
-            )
-            if action:
-                actions.append(action)
-
-        # Low win rate → tighten SL
-        if m.win_rate < 0.40 and m.total_trades >= 30:
-            action = self._nudge_down(
-                "ORB_STOP_LOSS_PERCENT",
-                reason=f"ORB low WR={m.win_rate:.1%} → tightening SL",
-                strategy="orb",
-                snapshot=snapshot,
-            )
-            if action:
-                actions.append(action)
-
-        # Deeply negative → reduce sizing
-        if m.total_pnl < Decimal("-50") and m.total_trades >= 20:
-            action = self._nudge_down(
-                "ORB_ORDER_SIZE_USD",
-                reason=f"ORB negative PnL ${m.total_pnl:.2f} → reducing size",
-                strategy="orb",
-                snapshot=snapshot,
-            )
-            if action:
-                actions.append(action)
-
-        # Very profitable → increase sizing
-        if m.total_pnl > Decimal("100") and m.profit_factor > 1.5:
-            action = self._nudge_up(
-                "ORB_ORDER_SIZE_USD",
-                reason=f"ORB profitable ${m.total_pnl:.2f} PF={m.profit_factor:.2f} → sizing up",
-                strategy="orb",
                 snapshot=snapshot,
             )
             if action:
@@ -399,21 +337,32 @@ class AutoTuner:
     # ── History ───────────────────────────────────────────────────────────────
 
     def _persist_history(self) -> None:
-        """Save tuning history to JSON."""
+        """Save tuning history to JSON, including last_tune_time for restart safety."""
         path = Path("data/guardian_tune_history.json")
         path.parent.mkdir(parents=True, exist_ok=True)
         recent = self._history[-200:]
         try:
-            path.write_text(json.dumps([a.to_dict() for a in recent], indent=2))
+            payload = {
+                "last_tune_time": self._last_tune_time,
+                "actions": [a.to_dict() for a in recent],
+            }
+            path.write_text(json.dumps(payload, indent=2))
         except Exception as e:
             logger.warning("Failed to persist tune history: {}", e)
 
     def _load_history(self) -> None:
-        """Load previous tuning history."""
+        """Load previous tuning history and restore last_tune_time (survives restarts)."""
         path = Path("data/guardian_tune_history.json")
         if path.exists():
             try:
-                data = json.loads(path.read_text())
+                raw = json.loads(path.read_text())
+                # Support both old format (list) and new format (dict with last_tune_time)
+                if isinstance(raw, list):
+                    actions_data = raw
+                else:
+                    # New format: restore cooldown so container restarts don't bypass it
+                    self._last_tune_time = float(raw.get("last_tune_time", 0.0))
+                    actions_data = raw.get("actions", [])
                 self._history = [
                     TuneAction(
                         parameter=d.get("parameter", ""),
@@ -422,8 +371,16 @@ class AutoTuner:
                         reason=d.get("reason", ""),
                         strategy=d.get("strategy", ""),
                     )
-                    for d in data
+                    for d in actions_data
                 ]
+                if self._last_tune_time > 0:
+                    import time as _t
+                    remaining = self.TUNE_COOLDOWN_S - (_t.time() - self._last_tune_time)
+                    if remaining > 0:
+                        logger.info(
+                            "AutoTuner: cooldown restored — {:.0f}h remaining until next tune",
+                            remaining / 3600,
+                        )
             except Exception:
                 pass
 

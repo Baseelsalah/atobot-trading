@@ -23,7 +23,6 @@ from src.strategies.base_strategy import BaseStrategy
 from src.strategies.crypto_strategy import CryptoSwingStrategy
 from src.strategies.ema_pullback_strategy import EMAPullbackStrategy
 from src.strategies.momentum_strategy import MomentumStrategy
-from src.strategies.orb_strategy import ORBStrategy
 from src.strategies.pairs_strategy import PairsTradingStrategy
 from src.strategies.swing_strategy import SwingStrategy
 from src.strategies.vwap_strategy import VWAPScalpStrategy
@@ -299,7 +298,6 @@ class AtoBot:
         """Create strategy instances based on STRATEGIES config."""
         strategy_map = {
             "momentum": MomentumStrategy,
-            "orb": ORBStrategy,
             "vwap_scalp": VWAPScalpStrategy,
             "ema_pullback": EMAPullbackStrategy,
             "pairs": PairsTradingStrategy,

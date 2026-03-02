@@ -7,7 +7,6 @@ Re-runs every WALK_FORWARD_INTERVAL_HOURS (default 168 = weekly).
 Optimisable parameters per strategy:
   - VWAP:      bounce_pct, tp_pct, sl_pct
   - Momentum:  RSI thresholds, TP/SL
-  - ORB:       range minutes, breakout_pct, TP/SL
   - EMA:       fast/slow EMA, TP/SL
 
 Uses grid search within safe bounds to keep complexity manageable.
@@ -42,12 +41,6 @@ PARAM_GRIDS: dict[str, dict[str, tuple[float, float, float]]] = {
         "RSI_OVERBOUGHT": (65.0, 80.0, 5.0),
         "MOMENTUM_TAKE_PROFIT_PERCENT": (0.50, 2.00, 0.25),
         "MOMENTUM_STOP_LOSS_PERCENT": (0.30, 1.00, 0.10),
-    },
-    "orb": {
-        "ORB_RANGE_MINUTES": (10.0, 30.0, 5.0),
-        "ORB_BREAKOUT_PERCENT": (0.05, 0.25, 0.05),
-        "ORB_TAKE_PROFIT_PERCENT": (0.75, 2.50, 0.25),
-        "ORB_STOP_LOSS_PERCENT": (0.30, 1.00, 0.10),
     },
     "ema_pullback": {
         "EMA_FAST_PERIOD": (8.0, 13.0, 1.0),

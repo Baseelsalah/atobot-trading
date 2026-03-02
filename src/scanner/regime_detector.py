@@ -505,52 +505,40 @@ class MarketRegimeDetector:
 
         Returns dict like {"momentum": 1.2, "vwap_scalp": 0.8, "ema_pullback": 1.0}
 
-        v4 update: ORB disabled (consistently negative). EMA Pullback added
-        as trend-following complement to VWAP mean-reversion.
+        v4 update: EMA Pullback added as trend-following complement to VWAP mean-reversion.
 
         v5 (hardened): In extreme volatility, mean-reversion longs are
-        deadly (buying dips in a crash). Favor momentum/ORB shorts.
+        deadly (buying dips in a crash). Favor momentum.
         """
-        weights = {"momentum": 1.0, "vwap_scalp": 1.2, "orb": 0.3, "ema_pullback": 1.0}
+        weights = {"momentum": 1.0, "vwap_scalp": 1.2, "ema_pullback": 1.0}
 
         # ── Extreme volatility override (VIX >30 / crisis mode) ──────
         # COVID stress test showed: VWAP buying dips = death in a crash.
-        # ORB riding momentum = survival. Shift weights accordingly.
         if regime.volatility == VolatilityRegime.EXTREME:
             weights["vwap_scalp"] = 0.4   # VWAP mean-reversion is dangerous
             weights["momentum"] = 1.3     # Big directional moves = edge
-            weights["orb"] = 0.8          # Breakouts work when vol is extreme
             weights["ema_pullback"] = 0.5 # Pullbacks unreliable in panics
             # Strong bear + extreme vol = full crisis mode
             if regime.trend in (TrendRegime.STRONG_BEAR, TrendRegime.BEAR):
                 weights["vwap_scalp"] = 0.2  # Nearly disable dip buying
                 weights["momentum"] = 1.4    # Ride the crash
-                weights["orb"] = 1.0         # Breakdowns work
             return weights
 
         # Trending market favors momentum + EMA pullback
         if regime.trend in (TrendRegime.STRONG_BULL, TrendRegime.STRONG_BEAR):
             weights["momentum"] = 1.3
             weights["vwap_scalp"] = 0.9
-            weights["orb"] = 0.3
             weights["ema_pullback"] = 1.4  # EMA pullback thrives in strong trends
 
         # Choppy market favors mean-reversion (VWAP)
         elif regime.trend == TrendRegime.CHOPPY:
             weights["momentum"] = 0.5
             weights["vwap_scalp"] = 1.4
-            weights["orb"] = 0.2
             weights["ema_pullback"] = 0.6  # Pullbacks less reliable in chop
 
         # Bull trend favors EMA pullback
         elif regime.trend == TrendRegime.BULL:
             weights["ema_pullback"] = 1.2
-
-        # Opening range breakout best at open (still lowered)
-        if regime.session == SessionPhase.OPEN_DRIVE:
-            weights["orb"] = min(weights["orb"] * 1.5, 0.6)
-        elif regime.session == SessionPhase.MIDDAY_CHOP:
-            weights["orb"] = 0.1
 
         # Elevated vol favors momentum (bigger moves)
         if regime.volatility == VolatilityRegime.ELEVATED:

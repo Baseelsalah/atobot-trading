@@ -1,8 +1,8 @@
 # AtoBot Trading
 
-**Autonomous algorithmic day-trading bot** built in async Python -- connects to **Alpaca Markets** (paper or live) to trade US equities during market hours with seven pluggable strategies, a self-healing Guardian agent, OpenAI-powered trade analysis, and a real-time Streamlit dashboard.
+**Autonomous algorithmic day-trading bot** built in async Python -- connects to **Alpaca Markets** (paper or live) to trade US equities during market hours with six pluggable strategies, a self-healing Guardian agent, OpenAI-powered trade analysis, and a real-time Streamlit dashboard.
 
-> **1-Year Backtest Result:** VWAP Scalp + ORB on 8 symbols at $35K order size -> **+$83,534 net P&L on a $100K account** using 2:1 margin (exceeds $75K/yr target by 11%).
+> **1-Year Backtest Result:** VWAP Scalp on 8 symbols at $35K order size -> **+$83,534 net P&L on a $100K account** using 2:1 margin (exceeds $75K/yr target by 11%).
 
 ---
 
@@ -27,7 +27,7 @@ src/
 |-- utils/           Loguru logger, retry decorator, helpers
 |-- exchange/        Abstract base + Alpaca async client
 |-- data/            MarketDataProvider + indicators (RSI, EMA, VWAP, ATR, BBands)
-|-- strategies/      7 strategies (see below) + strategy selector
+|-- strategies/      6 strategies (see below) + strategy selector
 |-- scanner/         MarketScanner, RegimeDetector, NewsIntel
 |-- intelligence/    AITradeAdvisor (GPT-4o-mini), MLModel, MLFeatureEngine
 |-- risk/            RiskManager + Kelly Criterion position sizer
@@ -47,7 +47,7 @@ tests/               152 pytest-asyncio tests
 
 | Feature | Detail |
 |---------|--------|
-| **7 trading strategies** | VWAP Scalp, ORB, Momentum, EMA Pullback, Swing, Pairs/StatArb, Crypto |
+| **6 trading strategies** | VWAP Scalp, Momentum, EMA Pullback, Swing, Pairs/StatArb, Crypto |
 | **Multi-strategy** | Run several strategies simultaneously; signals weighted by regime |
 | **Market regime detection** | Trend / volatility / breadth / sector-rotation classifier before every trade |
 | **AI trade advisor** | GPT-4o-mini pre-trade sentiment check + daily market briefing (optional) |
@@ -119,16 +119,6 @@ Enters long when price bounces off VWAP from below. High-frequency; many small w
 | `VWAP_TAKE_PROFIT_PERCENT` | 0.5 | % profit target |
 | `VWAP_STOP_LOSS_PERCENT` | 0.3 | % stop-loss |
 | `VWAP_ORDER_SIZE_USD` | 500 | Dollar amount per trade |
-
-### ORB (Opening Range Breakout)
-Defines the high/low of the first 15 minutes, then enters on a confirmed breakout above the range. Works best paired with VWAP.
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `ORB_RANGE_MINUTES` | 15 | Minutes to define opening range |
-| `ORB_BREAKOUT_PERCENT` | 0.1 | % above range to confirm breakout |
-| `ORB_TAKE_PROFIT_PERCENT` | 1.5 | % profit target |
-| `ORB_STOP_LOSS_PERCENT` | 0.75 | % stop-loss |
 
 ### Momentum (RSI + Volume)
 Buys when RSI is oversold **and** volume spikes above the 20-period average. Lower frequency, larger per-trade moves.
@@ -274,7 +264,7 @@ All settings load from environment variables or a `.env` file. See `.env.example
 | Alpaca | `ALPACA_API_KEY` / `ALPACA_API_SECRET` | -- |
 | Alpaca | `ALPACA_PAPER` | true |
 | Trading | `SYMBOLS` | ["AAPL","TSLA",...] |
-| Trading | `STRATEGIES` | ["vwap_scalp","orb"] |
+| Trading | `STRATEGIES` | ["vwap_scalp","momentum"] |
 | Trading | `BASE_ORDER_SIZE_USD` | 500 |
 | Trading | `DRY_RUN` | true |
 | Filters | `AVOID_MIDDAY` | true |

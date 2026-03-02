@@ -124,7 +124,7 @@ class MomentumStrategy(BaseStrategy):
                     )
                 return orders
 
-            # MACD death cross early exit (matches VWAP/ORB behavior)
+            # MACD death cross early exit (matches VWAP behavior)
             if getattr(self.settings, "MACD_CONFIRMATION_ENABLED", True):
                 try:
                     ohlcv_exit = await self.exchange.get_klines(symbol, "5m", 40)

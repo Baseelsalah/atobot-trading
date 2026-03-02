@@ -22,7 +22,7 @@ def selector():
     )
     sel.register_strategy("momentum")
     sel.register_strategy("vwap")
-    sel.register_strategy("orb")
+    sel.register_strategy("ema_pullback")
     return sel
 
 
@@ -33,7 +33,7 @@ def mock_regime():
     rd.get_strategy_weights.return_value = {
         "momentum": 1.2,
         "vwap": 0.8,
-        "orb": 0.5,
+        "ema_pullback": 1.0,
     }
     rd.get_size_multiplier.return_value = 0.9
     regime = MagicMock()
@@ -54,7 +54,7 @@ class TestRegistration:
     def test_register_strategy(self, selector):
         assert "momentum" in selector._strategies
         assert "vwap" in selector._strategies
-        assert "orb" in selector._strategies
+        assert "ema_pullback" in selector._strategies
 
     def test_register_duplicate(self, selector):
         selector.register_strategy("momentum")
@@ -90,13 +90,13 @@ class TestShouldTrade:
         assert "disabled" in reason
 
     def test_low_weight_blocked(self, selector):
-        selector._strategies["orb"].weight = 0.05
-        allowed, reason = selector.should_trade("orb")
+        selector._strategies["ema_pullback"].weight = 0.05
+        allowed, reason = selector.should_trade("ema_pullback")
         assert allowed is False
 
     def test_weight_below_threshold(self, selector):
-        selector._strategies["orb"].weight = 0.15  # Below 0.2 threshold
-        allowed, reason = selector.should_trade("orb")
+        selector._strategies["ema_pullback"].weight = 0.15  # Below 0.2 threshold
+        allowed, reason = selector.should_trade("ema_pullback")
         assert allowed is False
         assert "weight" in reason
 

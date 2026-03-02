@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from loguru import logger
 
+from src.analytics.profit_goals import ProfitGoalTracker
 from src.config.settings import Settings
 from src.data.market_data import MarketDataProvider
 from src.exchange.base_client import BaseExchangeClient
@@ -98,6 +99,22 @@ class TradingEngine:
                 settings.KELLY_SIZING_ENABLED,
                 self.position_sizer.max_risk_per_trade,
                 self.position_sizer.max_portfolio_heat,
+            )
+
+        # ── Profit Goal Tracker (daily/weekly/monthly targets) ─────────
+        self.profit_goals: ProfitGoalTracker | None = None
+        if getattr(settings, "PROFIT_GOALS_ENABLED", False):
+            daily_loss = getattr(settings, "PROFIT_GOAL_DAILY_LOSS_LIMIT", 0.0)
+            if daily_loss <= 0:
+                daily_loss = getattr(settings, "DAILY_LOSS_LIMIT_USD", 0.0)
+            self.profit_goals = ProfitGoalTracker(
+                daily_target=getattr(settings, "PROFIT_GOAL_DAILY", 0.0),
+                weekly_target=getattr(settings, "PROFIT_GOAL_WEEKLY", 0.0),
+                monthly_target=getattr(settings, "PROFIT_GOAL_MONTHLY", 0.0),
+                daily_loss_limit=daily_loss,
+                goal_met_risk_scale=getattr(settings, "PROFIT_GOAL_MET_RISK_SCALE", 0.25),
+                losing_day_risk_scale=getattr(settings, "PROFIT_GOAL_LOSING_RISK_SCALE", 0.50),
+                data_dir=getattr(settings, "TRADE_JOURNAL_DIR", "data"),
             )
 
         self._consecutive_errors = 0
@@ -193,6 +210,13 @@ class TradingEngine:
         if self.risk.is_halted:
             logger.warning("Trading halted: {}", self.risk.halt_reason)
             return
+
+        # ── Profit goal check — stop trading if daily loss limit hit ──
+        if self.profit_goals:
+            should_stop, stop_reason = self.profit_goals.should_stop_trading()
+            if should_stop:
+                logger.warning("Profit goals HALT: {}", stop_reason)
+                return
 
         # Update balance for risk tracking
         try:
@@ -489,6 +513,27 @@ class TradingEngine:
                         self.strategy_selector.get_size_multiplier(), weight, strat.name,
                     )
 
+            # ── Profit goal-based risk scaling (reduce size when goal met) ──
+            if self.profit_goals and str(order.side).upper() in ("BUY", "SHORT"):
+                goal_mult = self.profit_goals.get_risk_multiplier()
+                if goal_mult <= 0:
+                    logger.info(
+                        "Order BLOCKED by profit goals (daily loss limit) | {} [{}]",
+                        order.symbol, strat.name,
+                    )
+                    continue
+                if goal_mult < 1.0:
+                    if self._is_crypto_symbol(order.symbol):
+                        scaled_qty = max(0.000001, float(order.quantity) * goal_mult)
+                        order.quantity = Decimal(str(round(scaled_qty, 6)))
+                    else:
+                        scaled_qty = max(1.0, float(order.quantity) * goal_mult)
+                        order.quantity = Decimal(str(int(scaled_qty)))
+                    logger.debug(
+                        "Profit goal risk scale: {} qty={} (mult={:.2f}) [{}]",
+                        order.symbol, order.quantity, goal_mult, strat.name,
+                    )
+
             allowed, reason = await self.risk.can_place_order(order, balances)
             if not allowed:
                 logger.info(
@@ -680,8 +725,12 @@ class TradingEngine:
 
                     # Track PnL and trade count
                     self.risk.record_trade(trade.pnl)
+                    # Feed completed trade to Kelly Criterion (Fix #5)
+                    self._record_trade_to_kelly(order, fill_price, order.quantity, pos, trade_pnl)
                     if trade.pnl is not None:
                         await self.risk.update_daily_pnl(trade.pnl)
+                        if self.profit_goals:
+                            self.profit_goals.record_trade(float(trade.pnl))
 
                     continue  # Done with this dry-run order
 
@@ -756,8 +805,12 @@ class TradingEngine:
 
                     # Track PnL and trade count (Fix #2 & #3)
                     self.risk.record_trade(trade.pnl)
+                    # Feed completed trade to Kelly Criterion (Fix #5)
+                    self._record_trade_to_kelly(order, fill_price, filled_qty, pos, trade_pnl)
                     if trade.pnl is not None:
                         await self.risk.update_daily_pnl(trade.pnl)
+                        if self.profit_goals:
+                            self.profit_goals.record_trade(float(trade.pnl))
 
                 elif exchange_status == "CANCELED":
                     order.mark_cancelled()
@@ -813,6 +866,8 @@ class TradingEngine:
                         self.risk.record_trade(trade.pnl)
                         if trade.pnl is not None:
                             await self.risk.update_daily_pnl(trade.pnl)
+                            if self.profit_goals:
+                                self.profit_goals.record_trade(float(trade.pnl))
 
                         logger.info(
                             "Partial fill | {} {} @ {} new_qty={} total={}/{} [{}]",
@@ -924,8 +979,12 @@ class TradingEngine:
                         logger.error("Failed to update stream order: {}", exc)
 
                     self.risk.record_trade(trade.pnl)
+                    # Feed completed trade to Kelly Criterion (Fix #5)
+                    self._record_trade_to_kelly(matched_order, fill_price, filled_qty, pos, trade_pnl)
                     if trade.pnl is not None:
                         await self.risk.update_daily_pnl(trade.pnl)
+                        if self.profit_goals:
+                            self.profit_goals.record_trade(float(trade.pnl))
 
                 elif event_type == "partial_fill":
                     filled_qty = decimal_from_str(
@@ -972,6 +1031,8 @@ class TradingEngine:
                         self.risk.record_trade(trade.pnl)
                         if trade.pnl is not None:
                             await self.risk.update_daily_pnl(trade.pnl)
+                            if self.profit_goals:
+                                self.profit_goals.record_trade(float(trade.pnl))
 
                         logger.info(
                             "Stream partial fill | {} {} @ {} new={} total={}/{} [{}]",
@@ -1158,8 +1219,12 @@ class TradingEngine:
             except Exception:
                 pass
 
-            # ── Feed ATR for each trading symbol ──────────────────────
-            if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False):
+            # ── Feed ATR + rolling returns for each trading symbol ────────
+            # Returns cache powers the correlation risk check in RiskManager.
+            # Piggybacks on the ATR fetch (same 5m bars) to avoid extra calls.
+            # Correlation update: every 120 ticks (~10min) is sufficient.
+            _update_corr = (self._tick_count % 120 == 0)
+            if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False) or _update_corr:
                 for symbol in self.settings.SYMBOLS:
                     try:
                         import pandas as pd
@@ -1168,11 +1233,25 @@ class TradingEngine:
                             sym_df = pd.DataFrame(sym_bars_raw)
                             for col in ("high", "low", "close"):
                                 sym_df[col] = sym_df[col].astype(float)
-                            atr_pct = float(
-                                (sym_df["high"] - sym_df["low"]).tail(14).mean()
-                                / sym_df["close"].iloc[-1] * 100
-                            )
-                            self.risk.update_symbol_atr(symbol, atr_pct)
+
+                            # ATR feed (only when enabled)
+                            if getattr(self.settings, "ATR_ADAPTIVE_STOPS", False):
+                                atr_pct = float(
+                                    (sym_df["high"] - sym_df["low"]).tail(14).mean()
+                                    / sym_df["close"].iloc[-1] * 100
+                                )
+                                self.risk.update_symbol_atr(symbol, atr_pct)
+
+                            # Correlation cache update (Fix #6) — rolling 5m returns
+                            # Using intraday returns is more relevant than daily for
+                            # detecting short-lived correlation regimes (e.g., sector rotation).
+                            if _update_corr and len(sym_df) >= 10:
+                                closes = sym_df["close"].tolist()
+                                returns = [
+                                    (closes[i] - closes[i - 1]) / closes[i - 1]
+                                    for i in range(1, len(closes))
+                                ]
+                                self.risk.update_returns_cache(symbol, returns)
                     except Exception:
                         pass
 
@@ -1193,6 +1272,42 @@ class TradingEngine:
                 logger.info("Regime unfavorable: {} — trading cautiously", regime.summary())
         except Exception as exc:
             logger.debug("Regime update error: {}", exc)
+
+    def _record_trade_to_kelly(
+        self,
+        order: "Order",
+        fill_price: Decimal,
+        filled_qty: Decimal,
+        pos: "Position | None",
+        trade_pnl: "Decimal | None",
+    ) -> None:
+        """Feed a completed (closing) trade to PositionSizer for live Kelly updates.
+
+        Kelly Criterion requires accurate win_rate and avg_win/loss estimates.
+        Without this, f* is computed from stale backtest defaults, which can
+        lead to oversizing when live performance diverges from backtested results.
+
+        Only SELL / COVER orders contribute to Kelly — opening orders (BUY/SHORT)
+        don't have a realized P&L yet.
+
+        Complexity: O(1) per call; list append internally is amortized O(1).
+        """
+        order_side = str(order.side).upper()
+        if order_side not in ("SELL", "COVER"):
+            return
+        if pos is None or trade_pnl is None:
+            return
+
+        from src.risk.position_sizer import TradeRecord
+        self.position_sizer.add_trade_record(TradeRecord(
+            symbol=order.symbol,
+            strategy=order.strategy or "",
+            pnl=float(trade_pnl),
+            entry_price=float(pos.entry_price),
+            exit_price=float(fill_price),
+            quantity=float(filled_qty),
+            side=pos.side if pos.side else "LONG",
+        ))
 
     async def _send_heartbeat(self) -> None:
         """Send a periodic status update and save dashboard state."""
@@ -1218,6 +1333,9 @@ class TradingEngine:
                         f"  [{name}] orders={status.get('active_orders')} "
                         f"PnL={status.get('unrealized_pnl', 'N/A')}"
                     )
+                # Include profit goals progress
+                if self.profit_goals:
+                    lines.append(self.profit_goals.get_status_summary())
                 await self.notifier.send_message("\n".join(lines))
 
             # Save enriched state for dashboard
@@ -1245,6 +1363,10 @@ class TradingEngine:
             # Correlation penalties
             if self.position_sizer and hasattr(self.position_sizer, "_correlation_penalties"):
                 dashboard["correlation_penalties"] = dict(self.position_sizer._correlation_penalties)
+
+            # Profit goals state
+            if self.profit_goals:
+                dashboard["profit_goals"] = self.profit_goals.get_dashboard_data()
 
             # Pairs state
             for strat in self.strategies:
@@ -1375,11 +1497,15 @@ class TradingEngine:
             if hasattr(self.notifier, "send_daily_summary"):
                 await self.notifier.send_daily_summary(summary)
             else:
-                await self.notifier.send_message(
+                msg = (
                     f"📊 Daily Summary | PnL: {summary['pnl']} | "
                     f"Trades: {trades} | Win: {win_rate}% | "
                     f"Balance: {summary['balance']}"
                 )
+                # Append profit goals progress
+                if self.profit_goals:
+                    msg += "\n" + self.profit_goals.get_status_summary()
+                await self.notifier.send_message(msg)
             logger.info("Daily summary sent: {}", summary)
         except Exception as exc:
             logger.warning("Failed to send daily summary: {}", exc)

@@ -60,7 +60,6 @@ class AdaptiveStrategySelector:
         selector = AdaptiveStrategySelector()
         selector.register_strategy("momentum")
         selector.register_strategy("vwap")
-        selector.register_strategy("orb")
 
         # On regime update
         selector.update_from_regime(regime_detector)

@@ -47,15 +47,15 @@ try:
     # Verify strategy selector extreme vol blocking
     sel = AdaptiveStrategySelector()
     sel.register_strategy("vwap_scalp")
-    sel.register_strategy("orb")
+    sel.register_strategy("ema_pullback")
     sel._volatility_regime = "extreme"
     ok, reason = sel.should_trade("vwap_scalp", "BUY")
     assert not ok, "VWAP BUY should be blocked in extreme vol"
     assert "Extreme volatility" in reason
     ok2, _ = sel.should_trade("vwap_scalp", "SELL")
     assert ok2, "VWAP SELL should be allowed in extreme vol"
-    ok3, _ = sel.should_trade("orb", "BUY")
-    assert ok3, "ORB BUY should be allowed in extreme vol"
+    ok3, _ = sel.should_trade("ema_pullback", "BUY")
+    assert ok3, "EMA Pullback BUY should be allowed in extreme vol"
     print("[OK] Extreme vol blocking works")
     
     print("\n=== ALL HARDENING CHECKS PASSED ===")

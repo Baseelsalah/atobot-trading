@@ -55,8 +55,8 @@ class MLModel:
     - Model hasn't been trained yet
     """
 
-    MIN_SAMPLES = 100          # Minimum labeled samples to train
-    RETRAIN_INTERVAL = 500     # Retrain after this many new samples
+    MIN_SAMPLES = 500          # Minimum labeled samples to train (raised: <500 reliably overfits at 40 features)
+    RETRAIN_INTERVAL = 2000    # Retrain after this many new samples (raised: allows larger regime coverage)
     MODEL_DIR = "data/models"  # Persistence directory
 
     def __init__(self, model_path: str | None = None):
@@ -245,7 +245,7 @@ class MLModel:
     # ── Persistence ───────────────────────────────────────────────────────────
 
     def _save(self) -> None:
-        """Save model to disk."""
+        """Save model to disk using atomic write (temp file + rename) to prevent corruption."""
         try:
             Path(self.MODEL_DIR).mkdir(parents=True, exist_ok=True)
             state = {
@@ -255,8 +255,11 @@ class MLModel:
                 "sample_count": self._sample_count_at_train,
                 "saved_at": datetime.now(timezone.utc).isoformat(),
             }
-            with open(self._model_path, "wb") as f:
+            # Atomic write: write to .tmp then rename — prevents partial-write corruption
+            tmp_path = self._model_path + ".tmp"
+            with open(tmp_path, "wb") as f:
                 pickle.dump(state, f)
+            os.replace(tmp_path, self._model_path)  # atomic on POSIX; best-effort on Windows
             logger.info("ML Model saved to {}", self._model_path)
         except Exception as exc:
             logger.warning("Failed to save ML model: {}", exc)

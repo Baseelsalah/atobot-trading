@@ -80,19 +80,19 @@ class TestMultiStrategySettings:
         s = Settings(
             ALPACA_API_KEY="k",
             ALPACA_API_SECRET="s",
-            STRATEGIES='["vwap_scalp", "orb"]',
+            STRATEGIES='["vwap_scalp", "ema_pullback"]',
             NOTIFICATIONS_ENABLED=False,
         )
-        assert s.STRATEGIES == ["vwap_scalp", "orb"]
+        assert s.STRATEGIES == ["vwap_scalp", "ema_pullback"]
 
     def test_strategies_from_comma_string(self) -> None:
         s = Settings(
             ALPACA_API_KEY="k",
             ALPACA_API_SECRET="s",
-            STRATEGIES="vwap_scalp, orb",
+            STRATEGIES="vwap_scalp, ema_pullback",
             NOTIFICATIONS_ENABLED=False,
         )
-        assert s.STRATEGIES == ["vwap_scalp", "orb"]
+        assert s.STRATEGIES == ["vwap_scalp", "ema_pullback"]
 
     def test_strategies_empty_falls_back_to_default(self) -> None:
         s = Settings(
@@ -117,12 +117,12 @@ class TestMultiStrategySettings:
         s = Settings(
             ALPACA_API_KEY="k",
             ALPACA_API_SECRET="s",
-            STRATEGIES='["vwap_scalp", "orb", "momentum"]',
+            STRATEGIES='["vwap_scalp", "ema_pullback", "momentum"]',
             NOTIFICATIONS_ENABLED=False,
         )
         assert len(s.STRATEGIES) == 3
         assert "vwap_scalp" in s.STRATEGIES
-        assert "orb" in s.STRATEGIES
+        assert "ema_pullback" in s.STRATEGIES
         assert "momentum" in s.STRATEGIES
 
 
@@ -139,7 +139,7 @@ class TestMultiStrategyBot:
         self, mock_settings: Settings
     ) -> None:
         """_create_strategies should populate strategies list."""
-        mock_settings.STRATEGIES = ["vwap_scalp", "orb"]
+        mock_settings.STRATEGIES = ["vwap_scalp", "ema_pullback"]
         bot = AtoBot(mock_settings)
         # Mock exchange and risk_manager to avoid real connection
         bot.exchange = AsyncMock()
@@ -148,7 +148,7 @@ class TestMultiStrategyBot:
         assert len(bot.strategies) == 2
         names = [s.name for s in bot.strategies]
         assert "vwap_scalp" in names
-        assert "orb" in names
+        assert "ema_pullback" in names
 
     @pytest.mark.asyncio
     async def test_bot_single_strategy_from_default(

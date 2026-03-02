@@ -204,6 +204,18 @@ class VWAPScalpStrategy(BaseStrategy):
         # VWAP mean-reversion needs all-session volume; filters removed per backtest
         # Trend/midday filters are NOT applied for VWAP (backtest validated)
 
+        # ── Warm-up guard: block new entries until indicators are valid ───────
+        # MACD(12,26,9) = 35 bars minimum. Sub-35-bar VWAP deviations are noisy
+        # because the volume-weighted mean is computed from too few data points.
+        # Exits are unaffected — the guard is placed BEFORE the entry block.
+        _VWAP_MIN_WARMUP = 35  # O(1) constant check
+        if len(df) < _VWAP_MIN_WARMUP:
+            logger.debug(
+                "[VWAP] Warming up {} — {}/{} 5m bars. Entries suppressed.",
+                symbol, len(df), _VWAP_MIN_WARMUP,
+            )
+            return orders
+
         bounce_pct = Decimal(str(self.settings.VWAP_BOUNCE_PERCENT))
         deviation = ((vwap - current_price) / vwap) * Decimal("100")
 

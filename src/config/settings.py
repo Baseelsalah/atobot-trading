@@ -62,13 +62,6 @@ class Settings(BaseSettings):
     MOMENTUM_TAKE_PROFIT_PERCENT: float = 2.0
     MOMENTUM_STOP_LOSS_PERCENT: float = 1.0
 
-    # ── ORB (Opening Range Breakout) Strategy ─────────────────────────────────
-    ORB_RANGE_MINUTES: int = 15  # First N minutes to define opening range
-    ORB_BREAKOUT_PERCENT: float = 0.15  # % above range to confirm (backtest v3: 0.15)
-    ORB_TAKE_PROFIT_PERCENT: float = 1.5  # Single TP (no brackets in v3)
-    ORB_STOP_LOSS_PERCENT: float = 0.75  # Proven via backtest (0.50 too tight)
-    ORB_ORDER_SIZE_USD: float = 5000.0
-
     # ── EMA Pullback Strategy ─────────────────────────────────────────────────
     EMA_PULLBACK_FAST_PERIOD: int = 9     # Fast EMA for signal (9-bar)
     EMA_PULLBACK_SLOW_PERIOD: int = 21    # Slow EMA for trend (21-bar)
@@ -203,6 +196,15 @@ class Settings(BaseSettings):
     STRATEGY_COOLDOWN_MINUTES: int = 30     # Cooldown duration
     STRATEGY_MIN_WEIGHT: float = 0.2        # Min regime weight to trade
 
+    # ── Profit Goals (Daily / Weekly / Monthly Targets) ────────────────────────
+    PROFIT_GOALS_ENABLED: bool = True        # Track P&L against profit targets
+    PROFIT_GOAL_DAILY: float = 500.0         # Daily profit target in USD
+    PROFIT_GOAL_WEEKLY: float = 2500.0       # Weekly profit target in USD
+    PROFIT_GOAL_MONTHLY: float = 10000.0     # Monthly profit target in USD
+    PROFIT_GOAL_DAILY_LOSS_LIMIT: float = 0.0  # Hard daily loss stop (0 = use DAILY_LOSS_LIMIT_USD)
+    PROFIT_GOAL_MET_RISK_SCALE: float = 0.25   # Scale risk to 25% after hitting daily goal
+    PROFIT_GOAL_LOSING_RISK_SCALE: float = 0.50  # Scale risk to 50% when losing on the day
+
     # ── Ultra Bot: Trade Journal ──────────────────────────────────────────────
     TRADE_JOURNAL_ENABLED: bool = True      # Track all trades for analytics
     TRADE_JOURNAL_DIR: str = "data"         # Directory for journal files
@@ -306,7 +308,7 @@ class Settings(BaseSettings):
     CRYPTO_FEAR_GREED_ENABLED: bool = True   # Fear & Greed Index sizing adjustment
 
     # ── MACD Entry Confirmation ───────────────────────────────────────────────
-    MACD_CONFIRMATION_ENABLED: bool = False  # v3: disabled for VWAP/ORB (only Momentum uses MACD)
+    MACD_CONFIRMATION_ENABLED: bool = False  # Disabled — only Momentum uses MACD
     MACD_FAST: int = 12
     MACD_SLOW: int = 26
     MACD_SIGNAL: int = 9
@@ -384,7 +386,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Ensure strategy name is valid."""
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
+        allowed = {"momentum", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
         if v.lower() not in allowed:
             raise ValueError(f"DEFAULT_STRATEGY must be one of {allowed}, got '{v}'")
         return v.lower()
@@ -429,7 +431,7 @@ class Settings(BaseSettings):
         """If STRATEGIES is empty, fall back to [DEFAULT_STRATEGY]."""
         if not self.STRATEGIES:
             self.STRATEGIES = [self.DEFAULT_STRATEGY]
-        allowed = {"momentum", "orb", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
+        allowed = {"momentum", "vwap_scalp", "ema_pullback", "pairs", "swing", "crypto_swing"}
         for s in self.STRATEGIES:
             if s not in allowed:
                 raise ValueError(f"Unknown strategy in STRATEGIES: '{s}'. Allowed: {allowed}")

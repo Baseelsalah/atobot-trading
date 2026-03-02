@@ -503,7 +503,6 @@ class TestMarketRegimeDetector:
         regime = await regime_detector.update(spy_bars=spy_bars, vix_level=16.0)
         assert "momentum" in regime.strategy_weights
         assert "vwap_scalp" in regime.strategy_weights
-        assert "orb" in regime.strategy_weights
         assert "ema_pullback" in regime.strategy_weights
 
     @pytest.mark.asyncio
